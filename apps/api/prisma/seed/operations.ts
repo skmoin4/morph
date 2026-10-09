@@ -34,7 +34,7 @@ const OVERRIDES: Record<string, DayOverride> = {
   'amit|2026-09-30': { status: 'LATE', inTime: '09:52' },
   'amit|2026-10-03': { inTime: '09:25', outTime: '20:30' },
   'anil|2026-09-29': { status: 'ABSENT' },
-  'priya|2026-10-03': { status: 'HALF_DAY', inTime: '09:30', outTime: '13:00' },
+  'priya|2026-10-03': { status: 'HALF_DAY', inTime: '09:30', outTime: '14:00' },
   'pooja|2026-10-01': { status: 'ON_LEAVE' },
   // Site punch from outside the 120 m geofence: accepted but flagged.
   'neha|2026-09-30': { flagDistanceM: 310 },

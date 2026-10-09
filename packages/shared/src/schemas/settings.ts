@@ -113,6 +113,8 @@ const officeBaseSchema = z.object({
   allowedIPs: z.array(ipRuleSchema).max(50),
   /** A client site where GPS and a selfie are mandatory. */
   requiresGps: z.boolean(),
+  /** Outside the geofence: let the punch through marked for review, or refuse it. */
+  geofenceMode: z.enum(['FLAG', 'REJECT']).default('FLAG'),
   isActive: z.boolean().optional(),
 });
 

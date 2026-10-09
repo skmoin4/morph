@@ -12,3 +12,5 @@ if (!url) {
 
 process.env.DATABASE_URL = url.replace(/\/([^/?]+)(\?|$)/, '/$1_test$2');
 process.env.NODE_ENV = 'test';
+// Background jobs need Redis and have nothing to do in a test run.
+process.env.JOBS_ENABLED = 'false';

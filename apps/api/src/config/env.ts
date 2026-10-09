@@ -12,6 +12,19 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().url().default('http://localhost:5173'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
+  /**
+   * How many reverse proxies sit in front of the API. 0 trusts nobody's
+   * X-Forwarded-For. It matters: office-network punches are decided by the
+   * caller's IP, and a header anyone can set would let anyone punch "from the
+   * office". Set it to the real hop count only when a proxy you control is there.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
+  /** Background jobs (attendance closing, reminders). Off for tests. */
+  JOBS_ENABLED: z
+    .string()
+    .default('true')
+    .transform((v) => v !== 'false'),
+
   DATABASE_URL: z.string().min(1),
 
   JWT_ACCESS_SECRET: z.string().min(16),

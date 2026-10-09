@@ -110,6 +110,14 @@ enum TaskPriority {
   URGENT
 }
 
+/// What happens to a mobile punch made outside the site's geofence.
+enum GeofenceMode {
+  /// Accepted, but marked for review.
+  FLAG
+  /// Refused, with the distance in the message.
+  REJECT
+}
+
 enum PunchType {
   IN
   OUT
@@ -317,8 +325,10 @@ model Office {
   weeklyOffDays    Json     @default("[0]")
   /// JSON array of CIDR / plain IPv4 strings allowed for office punches.
   allowedIPs       Json     @default("[]")
-  /// A client site where GPS is mandatory regardless of employee method.
+  /// A client site where GPS is mandatory regardless of employee method:
+  /// office-network punches are refused there and mobile punches need a fix.
   requiresGps      Boolean  @default(false)
+  geofenceMode     GeofenceMode @default(FLAG)
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -1132,7 +1142,8 @@ model AttendancePolicy {
   graceMinutes           Int      @default(10)
   /// Minutes late beyond grace that trigger a LATE mark.
   lateMarkAfterMinutes   Int      @default(0)
-  /// Worked hours below this (but above zero) are a half day.
+  /// Hours at work from here up to the full-day minimum are a half day; less than
+  /// this is absent. (Column name predates the rule; the UI says "half day from".)
   halfDayBelowHours      Decimal  @default(4.00) @db.Decimal(5, 2)
   /// Worked hours at or above this are a full day.
   fullDayMinimumHours    Decimal  @default(8.00) @db.Decimal(5, 2)
@@ -1181,10 +1192,16 @@ model AttendanceRecord {
   flagReason       String?          @db.VarChar(400)
   /// True once a regularisation request has rewritten this day.
   isRegularised    Boolean          @default(false)
+  /// The day is over and judged. False while someone can still punch in or out;
+  /// the nightly job (and any read that needs it) settles those days.
+  isFinal          Boolean          @default(false)
   leaveRequestId   String?
   holidayId        String?
-  /// Day fraction credited: 1.00 full, 0.50 half, 0.00 absent.
+  /// Day fraction credited by the day's own punches: 1.00 full, 0.50 half, 0.00 absent.
   dayValue         Decimal          @default(0) @db.Decimal(3, 2)
+  /// Taken off `dayValue` by the "N late marks cost half a day" rule. Kept apart
+  /// so the monthly pass can be re-run (or undone by a regularisation) safely.
+  lateMarkDeduction Decimal         @default(0) @db.Decimal(3, 2)
   computedAt       DateTime?
   notes            String?          @db.VarChar(500)
   createdAt        DateTime         @default(now())
