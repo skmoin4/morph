@@ -13,6 +13,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   attendancePolicySchema,
+  bookingPolicySchema,
   createOfficeSchema,
   departmentSchema,
   designationSchema,
@@ -25,6 +26,7 @@ import {
   updateCompanySchema,
   updateOfficeSchema,
   type AttendancePolicyInput,
+  type BookingPolicyInput,
   type DepartmentInput,
   type DesignationInput,
   type ExpenseCategoryInput,
@@ -63,6 +65,25 @@ export class SettingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.settings.updateCompany(body, user);
+  }
+
+  // --- Booking policy --------------------------------------------------------
+
+  @Get('booking-policy')
+  @RequirePermissions('settings.view')
+  @ApiOperation({ summary: 'Who may create/confirm bookings, approval and the email reminder' })
+  getBookingPolicy(@CurrentUser() user: AuthenticatedUser) {
+    return this.settings.getBookingPolicy(user);
+  }
+
+  @Put('booking-policy')
+  @RequirePermissions('settings.edit')
+  @ApiOperation({ summary: 'Update the booking policy' })
+  updateBookingPolicy(
+    @Body(new ZodValidationPipe(bookingPolicySchema)) body: BookingPolicyInput,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.settings.updateBookingPolicy(body, user);
   }
 
   // --- Offices -------------------------------------------------------------

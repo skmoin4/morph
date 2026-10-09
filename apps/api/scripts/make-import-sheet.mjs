@@ -1,3 +1,5 @@
+// Dev helper: writes a sample employee-import .xlsx (valid or deliberately broken rows).
+// Usage: node scripts/make-import-sheet.mjs <out.xlsx> <mode>
 import ExcelJS from 'exceljs';
 const out = process.argv[2];
 const mode = process.argv[3];

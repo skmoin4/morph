@@ -66,7 +66,7 @@ Approved schema / design deviations:
 ## 6. Open items
 
 - **MySQL keeps stopping** during sessions – check the `.err` log in the datadir and find the cause. Do not change MySQL config without asking.
-- **Booking rules not yet confirmed by the client** – all are stored on `companies` and enforced by the API, with permissive defaults: `bookingCreateRoleIds`, `bookingConfirmRoleIds` (empty = the permission alone decides), `bookingRequiresApproval` (off), `verbalEmailGraceDays` (reminder only, never blocking). **There is no Settings screen for these yet** – today they change through the company settings API only.
+- **Booking rules not yet confirmed by the client** – all are stored on `companies` and enforced by the API, with permissive defaults: `bookingCreateRoleIds`, `bookingConfirmRoleIds` (empty = the permission alone decides), `bookingRequiresApproval` (off), `verbalEmailGraceDays` (reminder only, never blocking). They are edited in **Settings → Bookings** (`GET/PUT /settings/booking-policy`).
 - **Still to confirm with the client:** exact project code format and project type list; whether "schedule" means milestones only or a Gantt.
 - Payroll depth, Zoho accounting scope, desktop monitoring and biometric device are later-phase questions.
 

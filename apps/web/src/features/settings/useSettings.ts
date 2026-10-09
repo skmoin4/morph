@@ -125,7 +125,16 @@ export interface ExpenseCategory {
   _count: { expenses: number };
 }
 
+export interface BookingPolicy {
+  bookingCreateRoleIds: string[];
+  bookingConfirmRoleIds: string[];
+  bookingRequiresApproval: boolean;
+  verbalEmailGraceDays: number;
+  roles: Array<{ id: string; name: string }>;
+}
+
 export const settingsKeys = {
+  bookingPolicy: ['settings', 'booking-policy'] as const,
   company: ['settings', 'company'] as const,
   offices: ['settings', 'offices'] as const,
   departments: ['settings', 'departments'] as const,
@@ -141,6 +150,13 @@ export function useCompany() {
   return useQuery({
     queryKey: settingsKeys.company,
     queryFn: () => api.get<Company>('/settings/company'),
+  });
+}
+
+export function useBookingPolicy() {
+  return useQuery({
+    queryKey: settingsKeys.bookingPolicy,
+    queryFn: () => api.get<BookingPolicy>('/settings/booking-policy'),
   });
 }
 

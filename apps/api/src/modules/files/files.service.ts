@@ -82,7 +82,7 @@ export class FilesService {
 
     const absolute = path.join(this.root, document.storageKey);
     // Defence against a storageKey that somehow contains traversal segments.
-    if (!absolute.startsWith(this.root)) {
+    if (!absolute.startsWith(this.root + path.sep)) {
       throw new BadRequestException({ code: 'INVALID_PATH', message: 'Invalid file path.' });
     }
     if (!existsSync(absolute)) {

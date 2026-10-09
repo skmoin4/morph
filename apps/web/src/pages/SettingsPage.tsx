@@ -3,6 +3,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Tabs, TabPanel } from '../components/ui/Tabs';
 import { Pill } from '../components/ui/Pill';
 import { CompanyTab } from '../features/settings/CompanyTab';
+import { BookingPolicyTab } from '../features/settings/BookingPolicyTab';
 import { OfficesTab } from '../features/settings/OfficesTab';
 import {
   DepartmentsTab,
@@ -19,6 +20,7 @@ const TABS = [
   { key: 'departments', label: 'Departments' },
   { key: 'designations', label: 'Designations' },
   { key: 'project-types', label: 'Project types' },
+  { key: 'bookings', label: 'Bookings' },
   { key: 'holidays', label: 'Holidays' },
   { key: 'attendance', label: 'Attendance policy' },
   { key: 'leave-types', label: 'Leave types' },
@@ -59,6 +61,7 @@ export function SettingsPage() {
         {tab === 'departments' && <DepartmentsTab canEdit={canEdit} />}
         {tab === 'designations' && <DesignationsTab canEdit={canEdit} />}
         {tab === 'project-types' && <ProjectTypesTab canEdit={canEdit} />}
+        {tab === 'bookings' && <BookingPolicyTab canEdit={canEdit} />}
         {tab === 'holidays' && <HolidaysTab canEdit={canEdit} />}
         {tab === 'attendance' && <AttendancePoliciesTab canEdit={canEdit} />}
         {tab === 'leave-types' && <LeaveTypesTab canEdit={canEdit} />}

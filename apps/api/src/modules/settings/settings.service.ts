@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import type {
   AttendancePolicyInput,
+  BookingPolicyInput,
   DepartmentInput,
   DesignationInput,
   ExpenseCategoryInput,
@@ -34,6 +35,78 @@ export class SettingsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  // -------------------------------------------------------------------------
+  // Booking policy
+  // -------------------------------------------------------------------------
+
+  /**
+   * The booking rules the client has not settled, plus the company's roles so
+   * the screen can offer them. Roles ride along here because `role.view` is a
+   * different permission from `settings.view`, and this screen should work for
+   * whoever may open Settings.
+   */
+  async getBookingPolicy(user: AuthenticatedUser) {
+    const company = await this.getCompany(user);
+    const roles = await this.prisma.scoped.role.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    return {
+      bookingCreateRoleIds: (company.bookingCreateRoleIds as string[]) ?? [],
+      bookingConfirmRoleIds: (company.bookingConfirmRoleIds as string[]) ?? [],
+      bookingRequiresApproval: company.bookingRequiresApproval,
+      verbalEmailGraceDays: company.verbalEmailGraceDays,
+      roles,
+    };
+  }
+
+  async updateBookingPolicy(input: BookingPolicyInput, user: AuthenticatedUser) {
+    const before = await this.getBookingPolicy(user);
+
+    // A role id that is not this company's would silently lock everyone out
+    // (the allow-list could never match), so refuse it up front.
+    const known = new Set(before.roles.map((role) => role.id));
+    const unknown = [...input.bookingCreateRoleIds, ...input.bookingConfirmRoleIds].filter(
+      (id) => !known.has(id),
+    );
+    if (unknown.length > 0) {
+      throw new BadRequestException({
+        code: 'UNKNOWN_ROLE',
+        message: 'One of the selected roles does not exist.',
+      });
+    }
+
+    await runUnscoped(() =>
+      this.prisma.company.update({
+        where: { id: user.companyId },
+        data: {
+          bookingCreateRoleIds: input.bookingCreateRoleIds,
+          bookingConfirmRoleIds: input.bookingConfirmRoleIds,
+          bookingRequiresApproval: input.bookingRequiresApproval,
+          verbalEmailGraceDays: input.verbalEmailGraceDays,
+        },
+      }),
+    );
+
+    const after = await this.getBookingPolicy(user);
+    await this.audit.recordChange({
+      action: 'UPDATE',
+      entityType: 'Company',
+      entityId: user.companyId,
+      summary: 'Updated the booking policy',
+      before: before as unknown as Record<string, unknown>,
+      after: after as unknown as Record<string, unknown>,
+      fields: [
+        'bookingCreateRoleIds',
+        'bookingConfirmRoleIds',
+        'bookingRequiresApproval',
+        'verbalEmailGraceDays',
+      ],
+      userId: user.userId,
+    });
+    return after;
+  }
 
   // -------------------------------------------------------------------------
   // Company

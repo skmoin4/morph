@@ -806,6 +806,63 @@ describe('Bookings (e2e)', () => {
     });
   });
 
+  describe('booking policy settings', () => {
+    const defaults = {
+      bookingCreateRoleIds: [] as string[],
+      bookingConfirmRoleIds: [] as string[],
+      bookingRequiresApproval: false,
+      verbalEmailGraceDays: 7,
+    };
+
+    afterAll(async () => {
+      await request(server).put('/api/v1/settings/booking-policy').set(asCeo()).send(defaults);
+    });
+
+    it('reads the policy together with the roles it can pick from', async () => {
+      const res = await request(server)
+        .get('/api/v1/settings/booking-policy')
+        .set(asCeo())
+        .expect(200);
+      expect(res.body.bookingRequiresApproval).toBe(false);
+      expect(res.body.roles.map((r: { id: string }) => r.id)).toContain(ids.ceoRoleId);
+    });
+
+    it('saves the policy, and the booking module obeys it straight away', async () => {
+      await request(server)
+        .put('/api/v1/settings/booking-policy')
+        .set(asCeo())
+        .send({ ...defaults, bookingRequiresApproval: true, verbalEmailGraceDays: 3 })
+        .expect(200);
+
+      const summary = await request(server).get('/api/v1/bookings/summary').set(asCeo());
+      expect(summary.body.requiresApproval).toBe(true);
+
+      await request(server)
+        .put('/api/v1/settings/booking-policy')
+        .set(asCeo())
+        .send(defaults)
+        .expect(200);
+    });
+
+    it('refuses a role that does not belong to this company', async () => {
+      const res = await request(server)
+        .put('/api/v1/settings/booking-policy')
+        .set(asCeo())
+        .send({ ...defaults, bookingConfirmRoleIds: ['not-a-role'] })
+        .expect(400);
+      expect(res.body.code).toBe('UNKNOWN_ROLE');
+    });
+
+    it('is closed to a role without settings access', async () => {
+      await request(server).get('/api/v1/settings/booking-policy').set(asLead()).expect(403);
+      await request(server)
+        .put('/api/v1/settings/booking-policy')
+        .set(asLead())
+        .send(defaults)
+        .expect(403);
+    });
+  });
+
   describe('clients', () => {
     it('creates a client with contacts', async () => {
       const res = await request(server)
