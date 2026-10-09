@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { Clock } from './clock';
+import { NotifyService } from './notify/notify.service';
 import { DataScopeService } from './scope/data-scope.service';
 
 /**
@@ -11,7 +12,7 @@ import { DataScopeService } from './scope/data-scope.service';
  */
 @Global()
 @Module({
-  providers: [DataScopeService, Clock],
-  exports: [DataScopeService, Clock],
+  providers: [DataScopeService, NotifyService, Clock],
+  exports: [DataScopeService, NotifyService, Clock],
 })
 export class CommonModule {}

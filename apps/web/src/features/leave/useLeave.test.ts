@@ -8,6 +8,9 @@ describe('formatRange', () => {
   it('collapses a range within a month', () => {
     expect(formatRange('2026-10-19', '2026-10-21')).toBe('19–21 Oct');
   });
+  it('writes September as Sep, whatever the locale', () => {
+    expect(formatRange('2026-09-28', '2026-10-02')).toBe('28 Sep – 02 Oct');
+  });
   it('spells out a range across months', () => {
     expect(formatRange('2026-10-30', '2026-11-02')).toBe('30 Oct – 02 Nov');
   });

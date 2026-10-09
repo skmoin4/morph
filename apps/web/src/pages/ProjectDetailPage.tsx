@@ -18,10 +18,10 @@ import { ProjectStatusDialog } from '../features/projects/ProjectStatusDialog';
 import { ScheduleTab } from '../features/projects/ScheduleTab';
 import { TaskBoard } from '../features/projects/TaskBoard';
 import { TeamTab } from '../features/projects/TeamTab';
+import { ProjectTimeTab } from '../features/time/ProjectTimeTab';
 import { useProject } from '../features/projects/useProjects';
 
 const LATER_TABS = {
-  time: { label: 'Time', step: 'step 10', what: 'Approved timesheet hours by person and task' },
   expenses: { label: 'Expenses', step: 'step 11', what: 'Approved claims charged to this project' },
   cost: {
     label: 'Cost ledger',
@@ -92,6 +92,7 @@ export function ProjectDetailPage() {
     { key: 'schedule', label: 'Schedule', count: project.milestones.length },
     { key: 'team', label: 'Team', count: project.members.filter((m) => m.isActive).length },
     { key: 'tasks', label: 'Tasks', count: project.tasks.total },
+    ...(can('timesheet.view') ? [{ key: 'time', label: 'Time' }] : []),
     ...Object.entries(LATER_TABS).map(([key, value]) => ({ key, label: value.label })),
   ];
 
@@ -142,6 +143,9 @@ export function ProjectDetailPage() {
         {tab === 'schedule' && <ScheduleTab project={project} canEdit={canEdit} />}
         {tab === 'team' && <TeamTab project={project} canEdit={canEdit} />}
         {tab === 'tasks' && <TaskBoard project={project} />}
+        {tab === 'time' && can('timesheet.view') && (
+          <ProjectTimeTab projectId={project.id} budgetHours={Number(project.budgetHours)} />
+        )}
         {later && (
           <Panel title={later.label}>
             <EmptyState

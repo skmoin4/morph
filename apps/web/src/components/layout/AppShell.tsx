@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Sidebar } from './Sidebar';
-import { TopBar, type RunningTimer } from './TopBar';
+import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
 import { CommandPalette, useCommandPaletteShortcut } from '../command/CommandPalette';
+import { StartTimerDialog } from '../../features/time/StartTimerDialog';
+import { TimerControl } from '../../features/time/TimerControl';
 
 const COLLAPSED_KEY = 'opsvera:sidebar-collapsed';
 
@@ -13,7 +15,8 @@ export interface AppShellProps {
   roleName: string;
   permissions: ReadonlySet<string>;
   unreadCount?: number;
-  timer?: RunningTimer | null;
+  /** True when this person has an employee record and may log time. */
+  canTrackTime?: boolean;
   onSignOut?: () => void;
   children: ReactNode;
 }
@@ -29,7 +32,7 @@ export function AppShell({
   roleName,
   permissions,
   unreadCount = 0,
-  timer,
+  canTrackTime = false,
   onSignOut,
   children,
 }: AppShellProps) {
@@ -43,6 +46,7 @@ export function AppShell({
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [startingTimer, setStartingTimer] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,7 +75,9 @@ export function AppShell({
           userName={userName}
           roleName={roleName}
           unreadCount={unreadCount}
-          timer={timer}
+          timerSlot={
+            canTrackTime ? <TimerControl onRequestStart={() => setStartingTimer(true)} /> : null
+          }
           onOpenSearch={openPalette}
           onOpenMobileNav={() => setMobileOpen(true)}
           onQuickAction={openPalette}
@@ -83,6 +89,8 @@ export function AppShell({
 
         <MobileNav permissions={permissions} />
       </div>
+
+      {startingTimer && <StartTimerDialog onClose={() => setStartingTimer(false)} />}
 
       <CommandPalette
         open={paletteOpen}
@@ -101,14 +109,14 @@ export function AppShell({
             label: 'Start timer',
             section: 'Quick actions',
             permission: 'timesheet.create',
-            run: () => toast('Timer arrives in step 10.'),
+            run: () => setStartingTimer(true),
           },
           {
             id: 'action:apply-leave',
             label: 'Apply for leave',
             section: 'Quick actions',
             permission: 'leave.create',
-            run: () => toast('Leave form arrives in step 9.'),
+            run: () => navigate('/leave?apply=1'),
           },
         ]}
       />

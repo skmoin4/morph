@@ -49,7 +49,23 @@ PO / work order is **optional**, not mandatory. A verbal booking shows "Email pe
 - **Step 7 – done, awaiting review.** Projects, Project 360, team, milestones, tasks, Kanban (see below).
 - **Step 8 – done, awaiting review.** Shifts, punching, live board, register, regularisation, Excel export (see below).
 - **Step 9 – done, awaiting review.** Leave: balances, apply, one- and two-level approval, team calendar (see below).
-- **Next: Step 10** – Timer & timesheets.
+- **Step 10 – done, awaiting review.** Timer, manual time, weekly grid, submission, approval with cost posting, reopen (see below).
+- **Next: Step 11** – Expenses with two-step approval.
+
+### Step 10 – what exists
+
+- **Rules** (`packages/shared/src/time/rules.ts`, pure and unit-tested): weeks run Monday–Sunday; a timer entry is credited to the office-local date it **started** on; a timer stopped within a minute is thrown away; a timer left running is capped at **12 h** when stopped (the top bar turns amber past 12 h); no more than **24 h** on one date; hours to two decimals; time can be logged up to 90 days back; only DRAFT, REJECTED and REOPENED weeks can be edited.
+- **Timer:** project **and** task required; one per person, guaranteed by the database (unique index on the generated `runningKey`) as well as the service; survives reload and device change (the server holds it; the browser only ticks). Stop saves hours to the day, the week's sheet and the task's logged hours. A submitted or approved week refuses a new timer up front.
+- **Manual time:** any project you are on (or manage) that is Active, with or without a task. The weekly grid saves a cell as you type (`7.5`, `1:30`, `90m`); a cell holding timer entries is edited in the entries list instead, so a timer's record is never silently merged into a typed number. Everything here acts on the caller's own employee record only; other people's time is read-only.
+- **Weekly sheet:** created as a draft on first entry; submit needs time logged and no running timer in that week; the owner can withdraw until it is decided.
+- **Approval:** `timesheet.approve` within the data scope, never your own; out-of-scope sheets are 404. Rejection needs a comment and returns the week to the employee. **Approving, in one transaction, locks the entries and posts labour cost to the ledger** at the cost rate effective on each work date (one ledger row per project, with the rate breakdown when a rate changed mid-week). An unrated day refuses the approval (`NO_COST_RATE`) rather than hiding the cost. Posting date is the week's last day. Two approvers clicking together post once. Bulk approve/reject reports each sheet separately.
+- **Reopen:** `timesheet.reopen` (CEO by default), reason required, audited. Reverses the ledger posting with mirror-image negative rows, unlocks the entries and sends the week back; the next approval posts version 2. The ledger is append-only.
+- **Task hours:** each task's `loggedHours` is kept equal to its entries on every change (any status); project `actualHours` and cost move only on approval.
+- **Notifications:** approvers get a bell item on submit; the employee on approve, send-back or reopen. A shared `NotifyService` (common module) now serves both leave and timesheets.
+- **Screens:** Timesheets (My week with grid, entries and submit; Approvals queue with bulk actions and a review drawer), global timer in the top bar plus a "Start timer" quick action, and Project 360 → Time (hours by person and task, approved share against the budget).
+- **Role matrix:** Project Manager can now log their own time (`timesheet.create/edit`, OWN). Re-run `pnpm db:seed` on an existing database to pick this up.
+- **Not in this step:** the reminder job for unsubmitted timesheets (Step 14, with email); budget alerts and the ledger screen (Step 12).
+- **To confirm with the client:** 12 h timer cap and 24 h day limit; 90-day back-dating; cost posting date = week end; who may reopen (CEO only today); whether time on a task already marked Done should be refused (today it is allowed).
 
 ### Step 9 – what exists
 

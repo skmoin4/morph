@@ -269,14 +269,11 @@ export function formatDays(days: number): string {
   return `${Number.isInteger(days) ? days : days.toFixed(1)} day${days === 1 ? '' : 's'}`;
 }
 
-/** "02 Oct" for one day, "19–21 Oct" or "30 Oct – 02 Nov" for a range. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "02 Oct" for one day, "19–21 Oct" or "30 Oct – 02 Nov" for a range. Fixed month names: locales disagree on "Sep". */
 export function formatRange(from: string, to: string): string {
-  const label = (iso: string) =>
-    new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      timeZone: 'UTC',
-    });
+  const label = (iso: string) => `${iso.slice(8, 10)} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
   if (from === to) return label(from);
   const [fd, fm] = label(from).split(' ');
   const [td, tm] = label(to).split(' ');

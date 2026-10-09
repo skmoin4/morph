@@ -13,7 +13,6 @@ import {
   carryForwardAmount,
   closingDays,
   countLeaveDays,
-  DataScope,
   eachDate,
   LEAVE_ADVANCE_DAYS,
   LEAVE_BACKDATE_DAYS,
@@ -33,6 +32,7 @@ import {
   type LeaveRequestInput,
 } from '@opsvera/shared';
 import { Clock } from '../../common/clock';
+import { NotifyService } from '../../common/notify/notify.service';
 import { DataScopeService } from '../../common/scope/data-scope.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { PrismaService, type ScopedDb } from '../../prisma/prisma.service';
@@ -93,6 +93,7 @@ export class LeaveService {
     private readonly attendance: AttendanceService,
     private readonly loader: AttendanceContextLoader,
     private readonly clock: Clock,
+    private readonly notify: NotifyService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -1043,21 +1044,10 @@ export class LeaveService {
     type: 'LEAVE_APPROVED' | 'LEAVE_REJECTED',
     note: { title: string; body?: string; entityId: string },
   ) {
-    const employee = await this.prisma.scoped.employee.findFirst({
-      where: { id: employeeId },
-      select: { userId: true },
-    });
-    if (!employee?.userId) return;
-    await this.prisma.scoped.notification.create({
-      data: {
-        userId: employee.userId,
-        type,
-        title: note.title.slice(0, 200),
-        body: note.body?.slice(0, 1000) ?? null,
-        linkUrl: '/leave',
-        entityType: 'LeaveRequest',
-        entityId: note.entityId,
-      } as never,
+    await this.notify.toEmployee(employeeId, type, {
+      ...note,
+      linkUrl: '/leave',
+      entityType: 'LeaveRequest',
     });
   }
 
@@ -1067,50 +1057,13 @@ export class LeaveService {
     note: { title: string; body?: string; entityId: string },
     options: { exceptEmployeeId?: string } = {},
   ) {
-    const holders = await this.prisma.scoped.user.findMany({
-      where: {
-        status: 'ACTIVE',
-        deletedAt: null,
-        employee: { isNot: null },
-        role: { permissions: { some: { permission: { key: 'leave.approve' } } } },
-      },
-      select: {
-        id: true,
-        employee: { select: { id: true, officeId: true } },
-        role: {
-          select: {
-            permissions: {
-              where: { permission: { key: 'leave.approve' } },
-              select: { dataScope: true },
-            },
-          },
-        },
-      },
-    });
-
-    const recipients: string[] = [];
-    for (const holder of holders) {
-      const me = holder.employee;
-      if (!me || me.id === employee.id || me.id === options.exceptEmployeeId) continue;
-      const dataScope = holder.role.permissions[0]?.dataScope ?? DataScope.OWN;
-      const ids = await this.scope.visibleEmployeeIds(
-        { employeeId: me.id, officeId: me.officeId } as AuthenticatedUser,
-        dataScope as DataScope,
-      );
-      if (ids === null || ids.includes(employee.id)) recipients.push(holder.id);
-    }
-    if (recipients.length === 0) return;
-    await this.prisma.scoped.notification.createMany({
-      data: recipients.map((userId) => ({
-        userId,
-        type: 'LEAVE_SUBMITTED',
-        title: note.title.slice(0, 200),
-        body: note.body?.slice(0, 1000) ?? null,
-        linkUrl: '/leave?tab=approvals',
-        entityType: 'LeaveRequest',
-        entityId: note.entityId,
-      })) as never,
-    });
+    await this.notify.toApprovers(
+      'leave.approve',
+      employee.id,
+      'LEAVE_SUBMITTED',
+      { ...note, linkUrl: '/leave?tab=approvals', entityType: 'LeaveRequest' },
+      options,
+    );
   }
 
   // --- shaping -------------------------------------------------------------

@@ -15,7 +15,7 @@ import { useLeaveRequests } from '../features/leave/useLeave';
 export function LeavePage() {
   const { user, can } = useAuth();
   const [params, setParams] = useSearchParams();
-  const [applying, setApplying] = useState(false);
+  const [applying, setApplying] = useState(params.get('apply') === '1');
 
   const hasProfile = !!user?.employeeId;
   const canApply = hasProfile && can('leave.create');
@@ -73,7 +73,18 @@ export function LeavePage() {
         {tab === 'balances' && <BalancesTab />}
       </TabPanel>
 
-      {applying && <ApplyLeaveDialog onClose={() => setApplying(false)} />}
+      {applying && (
+        <ApplyLeaveDialog
+          onClose={() => {
+            setApplying(false);
+            if (params.get('apply')) {
+              const next = new URLSearchParams(params);
+              next.delete('apply');
+              setParams(next, { replace: true });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

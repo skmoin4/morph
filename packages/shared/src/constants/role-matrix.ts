@@ -79,6 +79,8 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       ...read('employee'),
       ...read('attendance'),
       'timesheet.view',
+      'timesheet.create',
+      'timesheet.edit',
       'timesheet.approve',
       'timesheet.export',
       'expense.view',
@@ -101,6 +103,8 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       'leave.view': DataScope.TEAM,
       'leave.create': DataScope.OWN,
       'leave.approve': DataScope.TEAM,
+      'timesheet.create': DataScope.OWN,
+      'timesheet.edit': DataScope.OWN,
     },
   },
   {

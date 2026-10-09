@@ -17,6 +17,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { LeaveModule } from './modules/leave/leave.module';
+import { TimeModule } from './modules/time/time.module';
 import { RequestContextMiddleware } from './common/interceptors/request-id.middleware';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -53,6 +54,7 @@ import { CommonModule } from './common/common.module';
     ProjectsModule,
     AttendanceModule,
     LeaveModule,
+    TimeModule,
     HealthModule,
   ],
   providers: [

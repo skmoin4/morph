@@ -16,6 +16,7 @@ import { TasksPage } from './pages/TasksPage';
 import { AttendancePage } from './pages/AttendancePage';
 import { ShiftsPage } from './pages/ShiftsPage';
 import { LeavePage } from './pages/LeavePage';
+import { TimesheetsPage } from './pages/TimesheetsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -29,14 +30,6 @@ const MODULES: Array<{
   step: string;
   permission: string;
 }> = [
-  {
-    path: '/timesheets',
-    eyebrow: 'People & Work',
-    title: 'Timesheets',
-    subtitle: 'Weekly grids, submission and approval.',
-    step: 'step 10',
-    permission: 'timesheet.view',
-  },
   {
     path: '/expenses',
     eyebrow: 'Money',
@@ -146,6 +139,14 @@ export function App() {
                 }
               />
               <Route
+                path="/timesheets"
+                element={
+                  <RequirePermission permission="timesheet.view">
+                    <TimesheetsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
                 path="/leave"
                 element={
                   <RequirePermission permission="leave.view">
@@ -207,6 +208,7 @@ function ProtectedShell() {
       userName={user.fullName}
       roleName={user.roleName}
       permissions={permissions}
+      canTrackTime={!!user.employeeId && permissions.has('timesheet.create')}
       onSignOut={signOut}
     >
       <Outlet />
