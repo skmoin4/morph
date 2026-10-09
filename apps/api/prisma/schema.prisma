@@ -1,0 +1,1650 @@
+// ---------------------------------------------------------------------------
+// OPSVERA — Phase 1 data model
+//
+// Conventions used throughout:
+//   * Every business table carries `companyId`. A Prisma client extension
+//     injects it into every read and write; nothing may bypass it.
+//   * Money is Decimal(15,2). Never a float.
+//   * Instants are stored in UTC (`DateTime`). Office-local calendar values
+//     (an attendance day, a timesheet week) are stored as `@db.Date`.
+//   * `createdById` / `updatedById` hold a User id but are deliberately not
+//     relations — a FK back-relation on User for all 30+ tables buys nothing
+//     and makes the model unreadable. They are indexed where queried.
+//   * `deletedAt` marks soft deletes; it is only on tables a user can remove
+//     while history still has to point at them.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================================================
+// ENUMS  (mirror packages/shared/src/constants/enums.ts)
+// ===========================================================================
+
+enum DataScope {
+  OWN
+  TEAM
+  PROJECT
+  OFFICE
+  ALL
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  NOTICE_PERIOD
+  EXITED
+}
+
+enum AttendanceMethod {
+  MOBILE
+  OFFICE
+  BOTH
+}
+
+enum BillingType {
+  FIXED
+  HOURLY
+  MILESTONE
+}
+
+enum BookingStatus {
+  DRAFT
+  CONFIRMED
+  PROJECT_CREATED
+  CANCELLED
+}
+
+enum ConfirmationType {
+  EMAIL
+  VERBAL
+}
+
+enum VerbalMode {
+  CALL
+  MEETING
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectHealth {
+  HEALTHY
+  AT_RISK
+  CRITICAL
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum PunchType {
+  IN
+  OUT
+}
+
+enum PunchSource {
+  MOBILE_GPS
+  OFFICE_IP
+  MANUAL
+  REGULARISED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  HALF_DAY
+  ABSENT
+  ON_LEAVE
+  HOLIDAY
+  WEEKLY_OFF
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveDayPart {
+  FULL_DAY
+  FIRST_HALF
+  SECOND_HALF
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REOPENED
+}
+
+enum TimeEntrySource {
+  TIMER
+  MANUAL
+}
+
+enum ExpenseStatus {
+  DRAFT
+  PENDING_MANAGER
+  PENDING_FINANCE
+  APPROVED
+  REJECTED
+}
+
+enum ReimbursementStatus {
+  PENDING
+  REIMBURSED
+}
+
+enum ApprovalStage {
+  MANAGER
+  FINANCE
+}
+
+enum CostSourceType {
+  TIMESHEET
+  EXPENSE
+  ADJUSTMENT
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  TIMESHEET_SUBMITTED
+  TIMESHEET_APPROVED
+  TIMESHEET_REJECTED
+  TIMESHEET_REMINDER
+  EXPENSE_SUBMITTED
+  EXPENSE_APPROVED
+  EXPENSE_REJECTED
+  LEAVE_SUBMITTED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  REGULARISATION_SUBMITTED
+  REGULARISATION_DECIDED
+  BUDGET_ALERT_80
+  BUDGET_ALERT_100
+  PROJECT_ASSIGNED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  CONFIRM
+  REOPEN
+  LOGIN
+  PERMISSION_CHANGE
+}
+
+enum DocumentOwnerType {
+  EMPLOYEE
+  BOOKING
+  PROJECT
+  TASK
+  EXPENSE
+  PUNCH
+  CLIENT
+}
+
+enum LeaveApprovalFlow {
+  SINGLE_LEVEL
+  TEAM_LEAD_THEN_MANAGER
+}
+
+// ===========================================================================
+// TENANCY & ORG STRUCTURE
+// ===========================================================================
+
+model Company {
+  id                String    @id @default(cuid())
+  name              String    @db.VarChar(200)
+  legalName         String?   @db.VarChar(200)
+  /// Prefix used by the project code generator, e.g. "MOR".
+  codePrefix        String    @db.VarChar(10)
+  /// Default pattern; tokens {PREFIX} {FY} {TYPE} {SEQ4}.
+  projectCodePattern String   @default("{PREFIX}-{FY}-{TYPE}-{SEQ4}") @db.VarChar(120)
+  /// 1-12. April = 4 for the Indian financial year.
+  fyStartMonth      Int       @default(4)
+
+  // --- Booking policy (not yet settled with the client, so configurable) ---
+  /// Role systemKeys / ids allowed to create a booking. Empty = fall back to
+  /// the booking.create permission alone.
+  bookingCreateRoleIds   Json    @default("[]")
+  /// Role ids allowed to confirm. Empty = the booking.confirm permission alone.
+  bookingConfirmRoleIds  Json    @default("[]")
+  /// When true a confirmed booking waits for a second approval before the
+  /// project is created.
+  bookingRequiresApproval Boolean @default(false)
+  /// Days a VERBAL booking may go without its confirmation email before it is
+  /// chased. Reminder only — it never blocks anything. 0 disables the chase.
+  verbalEmailGraceDays   Int     @default(7)
+  currency          String    @default("INR") @db.VarChar(3)
+  currencySymbol    String    @default("₹") @db.VarChar(5)
+  logoDocumentId    String?
+  gstin             String?   @db.VarChar(20)
+  addressLine1      String?   @db.VarChar(200)
+  addressLine2      String?   @db.VarChar(200)
+  city              String?   @db.VarChar(100)
+  state             String?   @db.VarChar(100)
+  country           String?   @db.VarChar(100)
+  postalCode        String?   @db.VarChar(20)
+  phone             String?   @db.VarChar(30)
+  email             String?   @db.VarChar(180)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String?
+  deletedAt         DateTime?
+
+  offices            Office[]
+  departments        Department[]
+  designations       Designation[]
+  holidays           Holiday[]
+  projectTypes       ProjectType[]
+  roles              Role[]
+  users              User[]
+  employees          Employee[]
+  clients            Client[]
+  bookings           Booking[]
+  projects           Project[]
+  shifts             Shift[]
+  attendancePolicies AttendancePolicy[]
+  leaveTypes         LeaveType[]
+  expenseCategories  ExpenseCategory[]
+  documents          Document[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  codeSequences      ProjectCodeSequence[]
+
+  @@unique([codePrefix])
+  @@map("companies")
+}
+
+model Office {
+  id               String   @id @default(cuid())
+  companyId        String
+  name             String   @db.VarChar(150)
+  shortCode        String   @db.VarChar(20)
+  /// IANA zone, e.g. "Asia/Kolkata", "Asia/Riyadh".
+  timezone         String   @default("Asia/Kolkata") @db.VarChar(64)
+  addressLine1     String?  @db.VarChar(200)
+  addressLine2     String?  @db.VarChar(200)
+  city             String?  @db.VarChar(100)
+  state            String?  @db.VarChar(100)
+  country          String?  @db.VarChar(100)
+  postalCode       String?  @db.VarChar(20)
+  latitude         Decimal? @db.Decimal(10, 7)
+  longitude        Decimal? @db.Decimal(10, 7)
+  geofenceRadiusM  Int      @default(200)
+  /// JSON array of ints 0..6 (0 = Sunday). Riyadh = [5,6].
+  weeklyOffDays    Json     @default("[0]")
+  /// JSON array of CIDR / plain IPv4 strings allowed for office punches.
+  allowedIPs       Json     @default("[]")
+  /// A client site where GPS is mandatory regardless of employee method.
+  requiresGps      Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  deletedAt        DateTime?
+
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees          Employee[]
+  holidays           Holiday[]
+  bookings           Booking[]
+  projects           Project[]
+  attendancePolicies AttendancePolicy[]
+  attendanceRecords  AttendanceRecord[]
+  punches            Punch[]
+
+  @@unique([companyId, shortCode])
+  @@index([companyId, isActive])
+  @@map("offices")
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String   @db.VarChar(150)
+  shortCode   String?  @db.VarChar(20)
+  headEmployeeId String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees       Employee[]
+  designations    Designation[]
+  shiftAssignments ShiftAssignment[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("departments")
+}
+
+model Designation {
+  id           String   @id @default(cuid())
+  companyId    String
+  departmentId String?
+  name         String   @db.VarChar(150)
+  level        Int?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  deletedAt    DateTime?
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  employees  Employee[]
+
+  @@unique([companyId, name])
+  @@index([companyId, departmentId])
+  @@map("designations")
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  companyId   String
+  /// Null = applies to every office in the company.
+  officeId    String?
+  name        String   @db.VarChar(150)
+  date        DateTime @db.Date
+  isOptional  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  office  Office? @relation(fields: [officeId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, officeId, date, name])
+  @@index([companyId, date])
+  @@map("holidays")
+}
+
+model ProjectType {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String   @db.VarChar(150)
+  /// Goes into the project code, e.g. HOS / DC / PHA / SOL.
+  shortCode   String   @db.VarChar(10)
+  colorToken  String?  @db.VarChar(20)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  projects Project[]
+
+  @@unique([companyId, shortCode])
+  @@unique([companyId, name])
+  @@map("project_types")
+}
+
+// ===========================================================================
+// RBAC & AUDIT
+// ===========================================================================
+
+model Permission {
+  id          String   @id @default(cuid())
+  /// `module.action`, e.g. "booking.confirm", "timesheet.approve".
+  key         String   @unique @db.VarChar(80)
+  module      String   @db.VarChar(40)
+  action      String   @db.VarChar(40)
+  label       String   @db.VarChar(150)
+  description String?  @db.VarChar(400)
+  /// True for keys that mask response fields rather than gate a route.
+  isSensitive Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@index([module])
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String   @db.VarChar(100)
+  /// Set for the six seeded roles; null for admin-created custom roles.
+  systemKey   String?  @db.VarChar(40)
+  description String?  @db.VarChar(400)
+  /// System roles cannot be deleted; CEO's permissions cannot be reduced to nothing.
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  users       User[]
+
+  @@unique([companyId, name])
+  @@index([companyId, systemKey])
+  @@map("roles")
+}
+
+model RolePermission {
+  id           String    @id @default(cuid())
+  companyId    String
+  roleId       String
+  permissionId String
+  /// How wide the role may see for this permission.
+  dataScope    DataScope @default(OWN)
+  createdAt    DateTime  @default(now())
+  createdById  String?
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([companyId, roleId])
+  @@map("role_permissions")
+}
+
+model User {
+  id                  String     @id @default(cuid())
+  companyId           String
+  /// Globally unique, not per company: login is email + password with no
+  /// company selector, so the address has to resolve to exactly one account.
+  email               String     @unique @db.VarChar(180)
+  passwordHash        String?    @db.VarChar(120)
+  fullName            String     @db.VarChar(150)
+  roleId              String
+  status              UserStatus @default(INVITED)
+  avatarDocumentId    String?
+  lastLoginAt         DateTime?
+  /// Invite / reset tokens are stored hashed, with a single-use expiry.
+  inviteTokenHash     String?    @db.VarChar(120)
+  inviteExpiresAt     DateTime?
+  resetTokenHash      String?    @db.VarChar(120)
+  resetExpiresAt      DateTime?
+  failedLoginCount    Int        @default(0)
+  lockedUntil         DateTime?
+  mustChangePassword  Boolean    @default(false)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  createdById         String?
+  deletedAt           DateTime?
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role          Role           @relation(fields: [roleId], references: [id])
+  employee      Employee?
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([companyId, status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  companyId  String
+  userId     String
+  /// SHA-256 of the token; the raw value only ever lives in the httpOnly cookie.
+  tokenHash  String    @unique @db.VarChar(120)
+  /// Set when rotated or logged out, so a replayed token is detectable.
+  revokedAt  DateTime?
+  expiresAt  DateTime
+  userAgent  String?   @db.VarChar(300)
+  ipAddress  String?   @db.VarChar(64)
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  companyId    String
+  userId       String?
+  action       AuditAction
+  /// Logical table name, e.g. "Booking", "EmployeeCostRate".
+  entityType   String      @db.VarChar(60)
+  entityId     String?     @db.VarChar(40)
+  /// Human line for the audit screen, e.g. "Confirmed booking MOR-26-27-HOS-0043".
+  summary      String      @db.VarChar(400)
+  beforeData   Json?
+  afterData    Json?
+  reason       String?     @db.VarChar(1000)
+  ipAddress    String?     @db.VarChar(64)
+  userAgent    String?     @db.VarChar(300)
+  requestId    String?     @db.VarChar(64)
+  createdAt    DateTime    @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([companyId, entityType, entityId])
+  @@index([companyId, userId])
+  @@map("audit_logs")
+}
+
+// ===========================================================================
+// FILES
+// ===========================================================================
+
+model Document {
+  id            String             @id @default(cuid())
+  companyId     String
+  /// What this file hangs off; polymorphic so one table serves every module.
+  ownerType     DocumentOwnerType?
+  ownerId       String?            @db.VarChar(40)
+  /// Free label like "PAN card", "Confirmation email", "Receipt".
+  category      String?            @db.VarChar(80)
+  fileName      String             @db.VarChar(255)
+  mimeType      String             @db.VarChar(120)
+  sizeBytes     Int
+  /// Always company/{companyId}/... — the storage driver resolves the rest.
+  storageKey    String             @db.VarChar(500)
+  storageDriver String             @default("local") @db.VarChar(20)
+  checksum      String?            @db.VarChar(80)
+  uploadedById  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bookingConfirmations  BookingConfirmation[]  @relation("ConfirmationEmail")
+  bookingPurchaseOrders BookingConfirmation[]  @relation("ConfirmationPO")
+  expenses              Expense[]
+  punches               Punch[]
+  taskAttachments       Attachment[]
+
+  @@index([companyId, ownerType, ownerId])
+  @@index([companyId, createdAt])
+  @@map("documents")
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  companyId   String
+  documentId  String
+  taskId      String?
+  projectId   String?
+  milestoneId String?
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  task      Task?      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project   Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone Milestone? @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, taskId])
+  @@index([companyId, projectId])
+  @@map("attachments")
+}
+
+// ===========================================================================
+// PEOPLE
+// ===========================================================================
+
+model Employee {
+  id               String           @id @default(cuid())
+  companyId        String
+  /// Null until a login invite is sent.
+  userId           String?          @unique
+  employeeCode     String           @db.VarChar(40)
+  firstName        String           @db.VarChar(80)
+  lastName         String           @db.VarChar(80)
+  personalEmail    String?          @db.VarChar(180)
+  workEmail        String?          @db.VarChar(180)
+  phone            String?          @db.VarChar(30)
+  dateOfBirth      DateTime?        @db.Date
+  gender           String?          @db.VarChar(20)
+  joiningDate      DateTime         @db.Date
+  exitDate         DateTime?        @db.Date
+  officeId         String
+  departmentId     String?
+  designationId    String?
+  managerId        String?
+  attendanceMethod AttendanceMethod @default(BOTH)
+  status           EmployeeStatus   @default(ACTIVE)
+  addressLine1     String?          @db.VarChar(200)
+  city             String?          @db.VarChar(100)
+  state            String?          @db.VarChar(100)
+  country          String?          @db.VarChar(100)
+  emergencyName    String?          @db.VarChar(120)
+  emergencyPhone   String?          @db.VarChar(30)
+  photoDocumentId  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  createdById      String?
+  deletedAt        DateTime?
+
+  company           Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user              User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  office            Office                 @relation(fields: [officeId], references: [id])
+  department        Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designation       Designation?           @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  manager           Employee?              @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports     Employee[]             @relation("EmployeeManager")
+  costRates         EmployeeCostRate[]
+  salaries          EmployeeSalary[]
+  shiftAssignments  ShiftAssignment[]
+  attendanceRecords AttendanceRecord[]
+  punches           Punch[]
+  regularisations   RegularisationRequest[]
+  leaveBalances     LeaveBalance[]
+  leaveRequests     LeaveRequest[]
+  timeEntries       TimeEntry[]
+  timesheets        Timesheet[]
+  expenses          Expense[]
+  projectMembers    ProjectMember[]
+  managedProjects   Project[]              @relation("ProjectManager")
+  assignedTasks     Task[]                 @relation("TaskAssignee")
+  taskComments      TaskComment[]
+  costLedgerEntries CostLedgerEntry[]
+
+  @@unique([companyId, employeeCode])
+  @@index([companyId, status])
+  @@index([companyId, officeId])
+  @@index([companyId, departmentId])
+  @@index([companyId, managerId])
+  @@map("employees")
+}
+
+/// Hourly cost rate with history. The rate *effective on the work date* is the
+/// one used for costing, so old rows are never updated in place.
+model EmployeeCostRate {
+  id            String    @id @default(cuid())
+  companyId     String
+  employeeId    String
+  hourlyRate    Decimal   @db.Decimal(15, 2)
+  currency      String    @default("INR") @db.VarChar(3)
+  effectiveFrom DateTime  @db.Date
+  /// Set when a newer rate supersedes this one; null = current.
+  effectiveTo   DateTime? @db.Date
+  note          String?   @db.VarChar(400)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, effectiveFrom])
+  @@index([companyId, employeeId, effectiveFrom])
+  @@map("employee_cost_rates")
+}
+
+model EmployeeSalary {
+  id            String    @id @default(cuid())
+  companyId     String
+  employeeId    String
+  monthlyAmount Decimal   @db.Decimal(15, 2)
+  currency      String    @default("INR") @db.VarChar(3)
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
+  note          String?   @db.VarChar(400)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, effectiveFrom])
+  @@index([companyId, employeeId, effectiveFrom])
+  @@map("employee_salaries")
+}
+
+// ===========================================================================
+// CLIENTS & BOOKING
+// ===========================================================================
+
+model Client {
+  id           String    @id @default(cuid())
+  companyId    String
+  name         String    @db.VarChar(200)
+  clientCode   String?   @db.VarChar(40)
+  industry     String?   @db.VarChar(100)
+  gstin        String?   @db.VarChar(20)
+  website      String?   @db.VarChar(200)
+  addressLine1 String?   @db.VarChar(200)
+  city         String?   @db.VarChar(100)
+  state        String?   @db.VarChar(100)
+  country      String?   @db.VarChar(100)
+  notes        String?   @db.Text
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  deletedAt    DateTime?
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contacts ClientContact[]
+  bookings Booking[]
+  projects Project[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("clients")
+}
+
+model ClientContact {
+  id          String    @id @default(cuid())
+  companyId   String
+  clientId    String
+  name        String    @db.VarChar(150)
+  designation String?   @db.VarChar(120)
+  email       String?   @db.VarChar(180)
+  phone       String?   @db.VarChar(30)
+  isPrimary   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([companyId, clientId])
+  @@map("client_contacts")
+}
+
+model Booking {
+  id                String        @id @default(cuid())
+  companyId         String
+  bookingNumber     String        @db.VarChar(40)
+  clientId          String
+  clientContactId   String?
+  projectName       String        @db.VarChar(200)
+  projectTypeId     String
+  officeId          String
+  bookingDate       DateTime      @db.Date
+  projectValue      Decimal       @db.Decimal(15, 2)
+  budgetHours       Decimal       @db.Decimal(12, 2)
+  /// Stored for Phase 1; invoicing comes later.
+  billingType       BillingType   @default(FIXED)
+  expectedStartDate DateTime      @db.Date
+  expectedEndDate   DateTime      @db.Date
+  scopeDescription  String?       @db.Text
+  /// PM carried over to the project on confirmation.
+  projectManagerId  String?
+  status            BookingStatus @default(DRAFT)
+  confirmedAt       DateTime?
+  confirmedById     String?
+  /// Only used when the company requires a second approval after confirmation.
+  approvalStatus    ApprovalStatus?
+  approvedAt        DateTime?
+  approvedById      String?
+  approvalNote      String?       @db.VarChar(1000)
+  cancelledAt       DateTime?
+  cancelReason      String?       @db.VarChar(1000)
+  /// Code minted at confirmation; mirrored on the project.
+  generatedProjectCode String?    @db.VarChar(60)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  createdById       String?
+  deletedAt         DateTime?
+
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client        Client               @relation(fields: [clientId], references: [id])
+  clientContact ClientContact?       @relation(fields: [clientContactId], references: [id], onDelete: SetNull)
+  projectType   ProjectType          @relation(fields: [projectTypeId], references: [id])
+  office        Office               @relation(fields: [officeId], references: [id])
+  confirmation  BookingConfirmation?
+  project       Project?
+
+  @@unique([companyId, bookingNumber])
+  @@index([companyId, status])
+  @@index([companyId, clientId])
+  @@index([companyId, bookingDate])
+  @@map("bookings")
+}
+
+/// The client's proof of go-ahead. Exactly one per booking; a booking cannot
+/// reach CONFIRMED without one, and a VERBAL row with no emailDocumentId is
+/// what drives the "Email pending" badge.
+model BookingConfirmation {
+  id               String           @id @default(cuid())
+  companyId        String
+  bookingId        String           @unique
+  type             ConfirmationType
+
+  // --- EMAIL ---
+  emailDocumentId  String?
+  emailReceivedAt  DateTime?        @db.Date
+
+  // --- VERBAL ---
+  confirmedByName  String?          @db.VarChar(120)
+  confirmedOn      DateTime?        @db.Date
+  verbalMode       VerbalMode?
+  verbalSummary    String?          @db.Text
+
+  // --- Optional PO / work order ---
+  poDocumentId     String?
+  poNumber         String?          @db.VarChar(80)
+
+  notes            String?          @db.Text
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  createdById      String?
+
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  emailDocument Document? @relation("ConfirmationEmail", fields: [emailDocumentId], references: [id], onDelete: SetNull)
+  poDocument    Document? @relation("ConfirmationPO", fields: [poDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, type])
+  @@map("booking_confirmations")
+}
+
+/// One counter row per company + financial year. Incremented under a
+/// `SELECT ... FOR UPDATE` row lock inside the confirmation transaction, so
+/// codes are gap-free from the counter's side and never reused.
+model ProjectCodeSequence {
+  id           String   @id @default(cuid())
+  companyId    String
+  /// Starting year of the FY, e.g. 2026 for FY 26-27.
+  fyStartYear  Int
+  /// Label as it appears in the code, e.g. "26-27".
+  fyLabel      String   @db.VarChar(20)
+  lastSequence Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, fyStartYear])
+  @@map("project_code_sequences")
+}
+
+// ===========================================================================
+// PROJECTS, SCHEDULE & TASKS
+// ===========================================================================
+
+model Project {
+  id               String        @id @default(cuid())
+  companyId        String
+  /// e.g. MOR-26-27-HOS-0043. Unique per company, never reused.
+  projectCode      String        @db.VarChar(60)
+  name             String        @db.VarChar(200)
+  /// Phase 1 rule: a project exists only because a booking was confirmed.
+  bookingId        String        @unique
+  clientId         String
+  projectTypeId    String
+  officeId         String
+  projectManagerId String?
+  status           ProjectStatus @default(ACTIVE)
+  health           ProjectHealth @default(HEALTHY)
+  startDate        DateTime?     @db.Date
+  endDate          DateTime?     @db.Date
+  /// Carried over from the booking at creation.
+  projectValue     Decimal       @db.Decimal(15, 2)
+  budgetHours      Decimal       @db.Decimal(12, 2)
+  billingType      BillingType   @default(FIXED)
+  description      String?       @db.Text
+  /// Denormalised running totals, maintained by the cost-ledger posting
+  /// service inside the same transaction as the ledger entry.
+  actualHours      Decimal       @default(0) @db.Decimal(12, 2)
+  actualLabourCost Decimal       @default(0) @db.Decimal(15, 2)
+  actualExpenseCost Decimal      @default(0) @db.Decimal(15, 2)
+  actualTotalCost  Decimal       @default(0) @db.Decimal(15, 2)
+  /// Highest budget threshold already alerted on (0 / 80 / 100) — keeps the
+  /// alert job from re-notifying on every posting.
+  budgetAlertLevel Int           @default(0)
+  completedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  createdById      String?
+  deletedAt        DateTime?
+
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  booking           Booking           @relation(fields: [bookingId], references: [id])
+  client            Client            @relation(fields: [clientId], references: [id])
+  projectType       ProjectType       @relation(fields: [projectTypeId], references: [id])
+  office            Office            @relation(fields: [officeId], references: [id])
+  projectManager    Employee?         @relation("ProjectManager", fields: [projectManagerId], references: [id], onDelete: SetNull)
+  members           ProjectMember[]
+  milestones        Milestone[]
+  tasks             Task[]
+  timeEntries       TimeEntry[]
+  expenses          Expense[]
+  costLedgerEntries CostLedgerEntry[]
+  attachments       Attachment[]
+
+  @@unique([companyId, projectCode])
+  @@index([companyId, status])
+  @@index([companyId, clientId])
+  @@index([companyId, projectManagerId])
+  @@index([companyId, officeId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id          String    @id @default(cuid())
+  companyId   String
+  projectId   String
+  employeeId  String
+  /// Free text role on the project, e.g. "BIM Coordinator".
+  roleOnProject String? @db.VarChar(120)
+  allocationPercent Int @default(100)
+  joinedOn    DateTime? @db.Date
+  leftOn      DateTime? @db.Date
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, employeeId])
+  @@index([companyId, employeeId])
+  @@map("project_members")
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  companyId   String
+  projectId   String
+  name        String          @db.VarChar(200)
+  description String?         @db.Text
+  dueDate     DateTime        @db.Date
+  completedOn DateTime?       @db.Date
+  status      MilestoneStatus @default(PENDING)
+  sortOrder   Int             @default(0)
+  /// Only meaningful when the project bills by milestone.
+  value       Decimal?        @db.Decimal(15, 2)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  attachments Attachment[]
+
+  @@index([companyId, projectId])
+  @@index([companyId, dueDate])
+  @@map("milestones")
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  companyId      String
+  projectId      String
+  milestoneId    String?
+  title          String       @db.VarChar(250)
+  description    String?      @db.Text
+  assigneeId     String?
+  status         TaskStatus   @default(TODO)
+  priority       TaskPriority @default(MEDIUM)
+  startDate      DateTime?    @db.Date
+  dueDate        DateTime?    @db.Date
+  estimatedHours Decimal?     @db.Decimal(10, 2)
+  /// Denormalised sum of approved + logged time, for the Kanban card.
+  loggedHours    Decimal      @default(0) @db.Decimal(12, 2)
+  /// Position within its Kanban column.
+  sortOrder      Int          @default(0)
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  createdById    String?
+  deletedAt      DateTime?
+
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone   Milestone?    @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  assignee    Employee?     @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments    TaskComment[]
+  timeEntries TimeEntry[]
+  attachments Attachment[]
+
+  @@index([companyId, projectId, status])
+  @@index([companyId, assigneeId, status])
+  @@index([companyId, dueDate])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id          String    @id @default(cuid())
+  companyId   String
+  taskId      String
+  employeeId  String?
+  body        String    @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  task     Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, taskId, createdAt])
+  @@map("task_comments")
+}
+
+// ===========================================================================
+// SHIFTS & ATTENDANCE
+// ===========================================================================
+
+model Shift {
+  id              String   @id @default(cuid())
+  companyId       String
+  name            String   @db.VarChar(120)
+  /// Office-local wall clock "HH:mm" — not an instant, so it survives DST.
+  startTime       String   @db.VarChar(5)
+  endTime         String   @db.VarChar(5)
+  /// True when endTime < startTime, e.g. a 22:00-06:00 night shift.
+  crossesMidnight Boolean  @default(false)
+  breakMinutes    Int      @default(60)
+  graceMinutes    Int      @default(10)
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+  deletedAt       DateTime?
+
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignments        ShiftAssignment[]
+  attendancePolicies AttendancePolicy[]
+  attendanceRecords  AttendanceRecord[]
+
+  @@unique([companyId, name])
+  @@map("shifts")
+}
+
+/// A shift applied to one employee or a whole department for a date range.
+/// Employee-level rows win over department-level rows for the same date.
+model ShiftAssignment {
+  id            String    @id @default(cuid())
+  companyId     String
+  shiftId       String
+  employeeId    String?
+  departmentId  String?
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
+  /// Per-assignment override of the office weekly offs; JSON array of 0..6.
+  weeklyOffDays Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+
+  shift      Shift       @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  employee   Employee?   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId, effectiveFrom])
+  @@index([companyId, departmentId, effectiveFrom])
+  @@map("shift_assignments")
+}
+
+/// The numbers the attendance rule engine runs on. Resolved per office, and
+/// optionally narrowed to one shift.
+model AttendancePolicy {
+  id                     String   @id @default(cuid())
+  companyId              String
+  officeId               String?
+  shiftId                String?
+  name                   String   @db.VarChar(120)
+  /// Minutes after shift start that are still on time.
+  graceMinutes           Int      @default(10)
+  /// Minutes late beyond grace that trigger a LATE mark.
+  lateMarkAfterMinutes   Int      @default(0)
+  /// Worked hours below this (but above zero) are a half day.
+  halfDayBelowHours      Decimal  @default(4.00) @db.Decimal(5, 2)
+  /// Worked hours at or above this are a full day.
+  fullDayMinimumHours    Decimal  @default(8.00) @db.Decimal(5, 2)
+  /// Worked hours beyond this count as overtime.
+  overtimeAfterHours     Decimal  @default(9.00) @db.Decimal(5, 2)
+  /// Leaving earlier than this many minutes before shift end is an early exit.
+  earlyExitBeforeMinutes Int      @default(15)
+  /// When nonzero, this many late marks add up to one half day.
+  lateMarksPerHalfDay    Int      @default(0)
+  isDefault              Boolean  @default(false)
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  createdById            String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  office  Office? @relation(fields: [officeId], references: [id], onDelete: Cascade)
+  shift   Shift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, officeId])
+  @@map("attendance_policies")
+}
+
+/// One row per employee per office-local calendar day. Recomputed by the rule
+/// engine on every punch and again by the nightly job.
+model AttendanceRecord {
+  id               String           @id @default(cuid())
+  companyId        String
+  employeeId       String
+  officeId         String
+  shiftId          String?
+  /// Office-local date this day belongs to.
+  attendanceDate   DateTime         @db.Date
+  status           AttendanceStatus @default(ABSENT)
+  firstInAt        DateTime?
+  lastOutAt        DateTime?
+  workedMinutes    Int              @default(0)
+  breakMinutes     Int              @default(0)
+  lateMinutes      Int              @default(0)
+  earlyExitMinutes Int              @default(0)
+  overtimeMinutes  Int              @default(0)
+  isLate           Boolean          @default(false)
+  isEarlyExit      Boolean          @default(false)
+  /// Set when a punch fell outside the geofence but was let through as flagged.
+  isFlagged        Boolean          @default(false)
+  flagReason       String?          @db.VarChar(400)
+  /// True once a regularisation request has rewritten this day.
+  isRegularised    Boolean          @default(false)
+  leaveRequestId   String?
+  holidayId        String?
+  /// Day fraction credited: 1.00 full, 0.50 half, 0.00 absent.
+  dayValue         Decimal          @default(0) @db.Decimal(3, 2)
+  computedAt       DateTime?
+  notes            String?          @db.VarChar(500)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  office   Office   @relation(fields: [officeId], references: [id])
+  shift    Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  punches  Punch[]
+
+  @@unique([employeeId, attendanceDate])
+  @@index([companyId, attendanceDate, status])
+  @@index([companyId, officeId, attendanceDate])
+  @@map("attendance_records")
+}
+
+model Punch {
+  id                 String      @id @default(cuid())
+  companyId          String
+  employeeId         String
+  attendanceRecordId String?
+  officeId           String?
+  type               PunchType
+  source             PunchSource
+  /// UTC instant of the punch.
+  punchedAt          DateTime
+  /// The office-local date it was attributed to.
+  attendanceDate     DateTime    @db.Date
+
+  // --- Mobile GPS evidence ---
+  latitude         Decimal? @db.Decimal(10, 7)
+  longitude        Decimal? @db.Decimal(10, 7)
+  accuracyM        Int?
+  /// Metres from the office or site pin at punch time.
+  distanceM        Int?
+  withinGeofence   Boolean?
+  selfieDocumentId String?
+
+  // --- Office network evidence ---
+  ipAddress String? @db.VarChar(64)
+  ipAllowed Boolean?
+
+  deviceInfo  String?  @db.VarChar(300)
+  /// Set when accepted but outside the radius, or added manually.
+  isFlagged   Boolean  @default(false)
+  flagReason  String?  @db.VarChar(400)
+  note        String?  @db.VarChar(400)
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  employee         Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendanceRecord AttendanceRecord? @relation(fields: [attendanceRecordId], references: [id], onDelete: SetNull)
+  office           Office?           @relation(fields: [officeId], references: [id], onDelete: SetNull)
+  selfieDocument   Document?         @relation(fields: [selfieDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId, punchedAt])
+  @@index([companyId, attendanceDate])
+  @@map("punches")
+}
+
+model RegularisationRequest {
+  id               String         @id @default(cuid())
+  companyId        String
+  employeeId       String
+  attendanceDate   DateTime       @db.Date
+  /// Requested corrections, office-local "HH:mm".
+  requestedInTime  String?        @db.VarChar(5)
+  requestedOutTime String?        @db.VarChar(5)
+  reason           String         @db.VarChar(1000)
+  status           ApprovalStatus @default(PENDING)
+  approverId       String?
+  decidedAt        DateTime?
+  decisionNote     String?        @db.VarChar(1000)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  createdById      String?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([companyId, employeeId, attendanceDate])
+  @@map("regularisation_requests")
+}
+
+// ===========================================================================
+// LEAVE
+// ===========================================================================
+
+model LeaveType {
+  id             String            @id @default(cuid())
+  companyId      String
+  name           String            @db.VarChar(120)
+  shortCode      String            @db.VarChar(10)
+  /// Days granted per leave year.
+  yearlyQuota    Decimal           @default(0) @db.Decimal(6, 2)
+  carryForward   Boolean           @default(false)
+  /// Cap on days carried into the next year; null = no cap.
+  maxCarryForward Decimal?         @db.Decimal(6, 2)
+  allowHalfDay   Boolean           @default(true)
+  isPaid         Boolean           @default(true)
+  approvalFlow   LeaveApprovalFlow @default(SINGLE_LEVEL)
+  colorToken     String?           @db.VarChar(20)
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  createdById    String?
+  deletedAt      DateTime?
+
+  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  balances LeaveBalance[]
+  requests LeaveRequest[]
+
+  @@unique([companyId, shortCode])
+  @@unique([companyId, name])
+  @@map("leave_types")
+}
+
+model LeaveBalance {
+  id            String   @id @default(cuid())
+  companyId     String
+  employeeId    String
+  leaveTypeId   String
+  /// Leave year, keyed by its starting calendar year.
+  year          Int
+  opening       Decimal  @default(0) @db.Decimal(6, 2)
+  accrued       Decimal  @default(0) @db.Decimal(6, 2)
+  carriedForward Decimal @default(0) @db.Decimal(6, 2)
+  used          Decimal  @default(0) @db.Decimal(6, 2)
+  /// Reserved by requests awaiting approval.
+  pending       Decimal  @default(0) @db.Decimal(6, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([companyId, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id           String         @id @default(cuid())
+  companyId    String
+  employeeId   String
+  leaveTypeId  String
+  fromDate     DateTime       @db.Date
+  toDate       DateTime       @db.Date
+  dayPart      LeaveDayPart   @default(FULL_DAY)
+  /// Working days requested, excluding holidays and weekly offs.
+  totalDays    Decimal        @db.Decimal(6, 2)
+  reason       String         @db.VarChar(1000)
+  status       ApprovalStatus @default(PENDING)
+  /// First level for a two-level flow; the only level for SINGLE_LEVEL.
+  level1ApproverId String?
+  level1DecidedAt  DateTime?
+  level1Note       String?    @db.VarChar(1000)
+  level2ApproverId String?
+  level2DecidedAt  DateTime?
+  level2Note       String?    @db.VarChar(1000)
+  decidedAt    DateTime?
+  cancelledAt  DateTime?
+  /// True once attendance rows have been written for the approved range.
+  attendanceApplied Boolean   @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  createdById  String?
+
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@index([companyId, status])
+  @@index([companyId, employeeId, fromDate])
+  @@index([companyId, fromDate, toDate])
+  @@map("leave_requests")
+}
+
+// ===========================================================================
+// TIME & TIMESHEETS
+// ===========================================================================
+
+/// Weekly container, Monday to Sunday in the employee's office time zone.
+/// Approving it locks the entries and posts labour cost exactly once.
+model Timesheet {
+  id            String          @id @default(cuid())
+  companyId     String
+  employeeId    String
+  /// Monday of the week, office-local.
+  weekStartDate DateTime        @db.Date
+  weekEndDate   DateTime        @db.Date
+  status        TimesheetStatus @default(DRAFT)
+  totalHours    Decimal         @default(0) @db.Decimal(10, 2)
+  billableHours Decimal         @default(0) @db.Decimal(10, 2)
+  submittedAt   DateTime?
+  approvedAt    DateTime?
+  approvedById  String?
+  rejectedAt    DateTime?
+  /// Set when an approved sheet is reopened; the reason is also audited.
+  reopenedAt    DateTime?
+  reopenReason  String?         @db.VarChar(1000)
+  /// Guards double posting: flipped inside the posting transaction.
+  costPostedAt  DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  createdById   String?
+
+  employee    Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  entries     TimeEntry[]
+  approvals   TimesheetApproval[]
+
+  @@unique([employeeId, weekStartDate])
+  @@index([companyId, status])
+  @@index([companyId, weekStartDate])
+  @@map("timesheets")
+}
+
+model TimesheetApproval {
+  id          String         @id @default(cuid())
+  companyId   String
+  timesheetId String
+  approverId  String
+  status      ApprovalStatus
+  comment     String?        @db.VarChar(1000)
+  decidedAt   DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+
+  timesheet Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, timesheetId])
+  @@index([companyId, approverId, status])
+  @@map("timesheet_approvals")
+}
+
+model TimeEntry {
+  id          String          @id @default(cuid())
+  companyId   String
+  employeeId  String
+  projectId   String
+  taskId      String?
+  timesheetId String?
+  /// Office-local date the work is credited to.
+  workDate    DateTime        @db.Date
+  /// Set while a timer is running; cleared when it stops.
+  startedAt   DateTime?
+  endedAt     DateTime?
+  /// Source of truth for cost. Timer entries write it on stop.
+  hours       Decimal         @default(0) @db.Decimal(6, 2)
+  isBillable  Boolean         @default(true)
+  source      TimeEntrySource @default(MANUAL)
+  /// STORED GENERATED COLUMN — never write to it.
+  ///   runningKey = IF(source = 'TIMER' AND endedAt IS NULL, employeeId, NULL)
+  /// With UNIQUE (companyId, runningKey) this makes "one running timer per
+  /// user" a database guarantee: a second start hits a duplicate key, which the
+  /// service maps to TIMER_ALREADY_RUNNING. NULL for every stopped or manual
+  /// entry, and MySQL permits unlimited NULLs in a unique index.
+  ///
+  /// Prisma cannot express generated columns, so the column is declared here as
+  /// a plain nullable string and promoted to GENERATED ... STORED by hand in
+  /// migration 0001. Keep it out of every create and update.
+  runningKey  String?         @db.VarChar(191)
+  description String?         @db.VarChar(1000)
+  /// Locked once its timesheet is approved.
+  isLocked    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  /// Restrict/NoAction is required, not a preference: employeeId is a base
+  /// column of the runningKey generated column, and MySQL rejects CASCADE,
+  /// SET NULL and SET DEFAULT referential actions on such a column (verified:
+  /// error 1215). It also happens to be the behaviour we want — time entries
+  /// are cost history and must outlive an employee row, which is soft-deleted
+  /// via deletedAt rather than removed.
+  employee  Employee   @relation(fields: [employeeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  project   Project    @relation(fields: [projectId], references: [id])
+  task      Task?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  timesheet Timesheet? @relation(fields: [timesheetId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId, workDate])
+  @@index([companyId, projectId, workDate])
+  @@index([companyId, taskId])
+  @@index([companyId, timesheetId])
+  @@unique([companyId, runningKey], map: "time_entries_running_timer_key")
+  @@index([companyId, employeeId, source])
+  @@map("time_entries")
+}
+
+// ===========================================================================
+// EXPENSES
+// ===========================================================================
+
+model ExpenseCategory {
+  id          String    @id @default(cuid())
+  companyId   String
+  name        String    @db.VarChar(120)
+  shortCode   String?   @db.VarChar(20)
+  /// Soft cap per claim; exceeding it warns rather than blocks.
+  perClaimLimit Decimal? @db.Decimal(15, 2)
+  perMonthLimit Decimal? @db.Decimal(15, 2)
+  requiresReceipt Boolean @default(true)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  @@unique([companyId, name])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id                  String              @id @default(cuid())
+  companyId           String
+  employeeId          String
+  projectId           String?
+  categoryId          String
+  expenseDate         DateTime            @db.Date
+  amount              Decimal             @db.Decimal(15, 2)
+  currency            String              @default("INR") @db.VarChar(3)
+  isBillable          Boolean             @default(false)
+  description         String?             @db.VarChar(1000)
+  receiptDocumentId   String?
+  status              ExpenseStatus       @default(DRAFT)
+  reimbursementStatus ReimbursementStatus @default(PENDING)
+  submittedAt         DateTime?
+  /// Set when Finance gives the second approval.
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  reimbursedAt        DateTime?
+  /// True when the amount exceeded the category limit at submission.
+  exceededLimit       Boolean             @default(false)
+  /// Guards double posting to the cost ledger.
+  costPostedAt        DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  createdById         String?
+  deletedAt           DateTime?
+
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project         Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category        ExpenseCategory   @relation(fields: [categoryId], references: [id])
+  receiptDocument Document?         @relation(fields: [receiptDocumentId], references: [id], onDelete: SetNull)
+  approvals       ExpenseApproval[]
+
+  @@index([companyId, status])
+  @@index([companyId, employeeId, expenseDate])
+  @@index([companyId, projectId])
+  @@map("expenses")
+}
+
+/// One row per stage decision. MANAGER then FINANCE; both must be APPROVED
+/// before the expense posts to the cost ledger.
+model ExpenseApproval {
+  id         String         @id @default(cuid())
+  companyId  String
+  expenseId  String
+  stage      ApprovalStage
+  approverId String?
+  status     ApprovalStatus @default(PENDING)
+  comment    String?        @db.VarChar(1000)
+  decidedAt  DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, stage])
+  @@index([companyId, status, stage])
+  @@map("expense_approvals")
+}
+
+// ===========================================================================
+// COST LEDGER
+// ===========================================================================
+
+/// Append-only project cost.
+///
+/// Idempotency and corrections both ride on the unique key
+/// (sourceType, sourceId, postingVersion, isReversal):
+///   * A repeated posting attempt for the same source and version fails loudly
+///     rather than double-counting.
+///   * Reopening an approved source does not mutate history. The reversal row
+///     carries the version it cancels; the next approval posts version + 1.
+/// So approve -> reopen -> approve -> reopen -> approve produces
+/// v1, v1-reversal, v2, v2-reversal, v3 — five rows, net = v3.
+///
+/// projectId is part of the key because a weekly timesheet legitimately spans
+/// several projects, and cost has to land on each one separately. One timesheet
+/// therefore posts one row per project per version.
+model CostLedgerEntry {
+  id          String         @id @default(cuid())
+  companyId   String
+  projectId   String
+  employeeId  String?
+  sourceType  CostSourceType
+  /// Timesheet id, Expense id, or a free reference for an adjustment.
+  sourceId    String         @db.VarChar(40)
+  /// Increments on every re-approval of the same source. Starts at 1.
+  postingVersion Int         @default(1)
+  /// True for the negative row that cancels (sourceId, postingVersion).
+  isReversal  Boolean        @default(false)
+  /// Office-local date the cost belongs to, for period reporting.
+  postingDate DateTime       @db.Date
+  hours       Decimal?       @db.Decimal(10, 2)
+  /// The cost rate effective on the work date, captured at posting time.
+  /// Set only when a single rate covered the whole posting; null when the
+  /// employee's rate changed inside the period. Either way `rateBreakdown`
+  /// carries the full working, so the number is never unexplained.
+  rateApplied Decimal?       @db.Decimal(15, 2)
+  /// How `amount` was arrived at, always populated for labour postings:
+  ///   [{ "from": "2026-09-28", "to": "2026-09-30", "hours": "24.00",
+  ///      "rate": "650.00", "amount": "15600.00" }, ...]
+  /// One segment per contiguous run of work dates sharing a rate, so a
+  /// single-rate posting has exactly one. Null for expense and adjustment
+  /// postings, which have no hours or rate to explain.
+  rateBreakdown Json?
+  amount      Decimal        @db.Decimal(15, 2)
+  currency    String         @default("INR") @db.VarChar(3)
+  description String?        @db.VarChar(500)
+  reversesId  String?
+  createdAt   DateTime       @default(now())
+  createdById String?
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@unique([sourceType, sourceId, projectId, postingVersion, isReversal], map: "cost_ledger_posting_key")
+  @@index([companyId, projectId, postingDate])
+  @@index([companyId, employeeId])
+  @@map("cost_ledger_entries")
+}
+
+// ===========================================================================
+// NOTIFICATIONS
+// ===========================================================================
+
+model Notification {
+  id         String           @id @default(cuid())
+  companyId  String
+  /// Recipient.
+  userId     String
+  type       NotificationType
+  title      String           @db.VarChar(200)
+  body       String?          @db.VarChar(1000)
+  /// Where the bell item navigates to, e.g. "/projects/abc".
+  linkUrl    String?          @db.VarChar(300)
+  entityType String?          @db.VarChar(60)
+  entityId   String?          @db.VarChar(40)
+  readAt     DateTime?
+  emailSentAt DateTime?
+  createdAt  DateTime         @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, readAt])
+  @@index([companyId, createdAt])
+  @@map("notifications")
+}

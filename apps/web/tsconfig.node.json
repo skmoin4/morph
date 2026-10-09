@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "types": ["node"] },
+  "include": ["vite.config.ts", "postcss.config.js", "tailwind.config.ts"]
+}

@@ -1,0 +1,13 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testRegex": "\\.e2e-spec\\.ts$",
+  "transform": { "^.+\\.ts$": ["ts-jest", {}] },
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^@opsvera/shared$": "<rootDir>/../../packages/shared/src/index.ts"
+  },
+  "setupFiles": ["<rootDir>/test/setup-env.ts"],
+  "testEnvironment": "node",
+  "testTimeout": 60000
+}

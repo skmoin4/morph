@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg font-sans text-body text-ink antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Keyboard users get a visible ring; mouse users do not. Part of the AA bar. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-blue ring-offset-2 ring-offset-bg;
+  }
+
+  /* Dark surfaces need the ring offset to match, or it reads as a white halo. */
+  .on-dark :focus-visible {
+    @apply ring-blue-2 ring-offset-nav;
+  }
+
+  ::selection {
+    @apply bg-blue/20;
+  }
+}
+
+@layer components {
+  /* Scrollbars inside panels and the sidebar, kept out of the way. */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(107, 120, 144, 0.3) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 120, 144, 0.28);
+    border-radius: 999px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
