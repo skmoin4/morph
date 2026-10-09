@@ -13,6 +13,8 @@ import { BookingsPage } from './pages/BookingsPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { TasksPage } from './pages/TasksPage';
+import { AttendancePage } from './pages/AttendancePage';
+import { ShiftsPage } from './pages/ShiftsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -26,22 +28,6 @@ const MODULES: Array<{
   step: string;
   permission: string;
 }> = [
-  {
-    path: '/attendance',
-    eyebrow: 'People & Work',
-    title: 'Attendance',
-    subtitle: 'Mobile and office punches, rules and the register.',
-    step: 'step 8',
-    permission: 'attendance.view',
-  },
-  {
-    path: '/shifts',
-    eyebrow: 'People & Work',
-    title: 'Shifts',
-    subtitle: 'Shift templates and the weekly roster.',
-    step: 'step 8',
-    permission: 'shift.view',
-  },
   {
     path: '/leave',
     eyebrow: 'People & Work',
@@ -147,6 +133,22 @@ export function App() {
                 element={
                   <RequirePermission permission="task.view">
                     <TasksPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/attendance"
+                element={
+                  <RequirePermission permission="attendance.view">
+                    <AttendancePage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/shifts"
+                element={
+                  <RequirePermission permission="shift.view">
+                    <ShiftsPage />
                   </RequirePermission>
                 }
               />

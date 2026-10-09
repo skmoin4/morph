@@ -860,6 +860,23 @@ export class AttendanceService {
     });
   }
 
+  /** Offices and departments for the screens' filters; names only. */
+  async lookups() {
+    const [offices, departments] = await Promise.all([
+      this.prisma.scoped.office.findMany({
+        where: { isActive: true, deletedAt: null },
+        select: { id: true, name: true, shortCode: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.scoped.department.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    return { offices, departments };
+  }
+
   // -------------------------------------------------------------------------
   // Live board
   // -------------------------------------------------------------------------

@@ -47,7 +47,19 @@ PO / work order is **optional**, not mandatory. A verbal booking shows "Email pe
 - **Step 6 – done, approved.** Clients and bookings API: confirmation rules, project code generation, configurable booking policy.
 - **Step 6b – done, approved.** Booking screens and a temporary Home page (see below).
 - **Step 7 – done, awaiting review.** Projects, Project 360, team, milestones, tasks, Kanban (see below).
-- **Next: Step 8** – Shifts and Attendance.
+- **Step 8 – done, awaiting review.** Shifts, punching, live board, register, regularisation, Excel export (see below).
+- **Next: Step 9** – Leave.
+
+### Step 8 – what exists
+
+- **Rule engine** (`packages/shared/src/attendance/engine.ts`, pure and unit-tested): turns punches plus shift, weekly off, holiday, approved leave and policy into a day status (Present, Half day, Absent, Late, Leave, Holiday, Weekly off, Not in yet). Night shifts are attributed to the day the shift started; a day is settled 4 hours after the shift ends. Breaks are deducted after 5 hours; late marks convert to a half-day deduction at the policy's rate.
+- **Punching:** mobile (GPS + selfie + geofence per office, `geofenceMode` FLAG or REJECT) and office network (IP allow-list). Double taps are guarded and punches take a row lock. Selfies are served only to users with attendance scope.
+- **Screens:** Attendance (clock card, Today board, monthly Register with Excel export, Corrections), Shifts (weekly roster, templates with assignments), an Attendance tab on Employee 360, and the clock card on Home. Data scope applies everywhere (Team Lead sees only their team; out-of-scope is a 404).
+- **Regularisation:** employee asks within 31 days; approver with `attendance.regularise` decides; approval writes an audited override.
+- **Env vars:** `TRUST_PROXY` (number of trusted proxies, default 0 — office-IP punching trusts `X-Forwarded-For` only when a real proxy is set) and `JOBS_ENABLED` (BullMQ day-settling job, off in tests).
+- **Policy wording:** the setting is now labelled "Half day from" (hours worked below this and above zero = half day; below full-day minimum is handled per policy).
+- **Seed note:** demo data is anchored to Oct 2026, so days after that show as absent in demos.
+- **To confirm with the client:** half-day tiers; a forgotten clock-out is held as a half day; the night shift has no policy in the seed; default geofence mode.
 
 ### Step 7 – what exists
 

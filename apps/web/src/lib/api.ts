@@ -138,8 +138,8 @@ export const api = {
   put: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
-  /** Fetches a stored file with the bearer token and hands it to the browser as a download. */
-  download: async (path: string, fileName: string) => {
+  /** Fetches a file with the bearer token (a plain <img src> or <a href> cannot send it). */
+  blob: async (path: string): Promise<Blob> => {
     const fetchOnce = () =>
       fetch(`${BASE_URL}${path}`, {
         credentials: 'include',
@@ -151,7 +151,11 @@ export const api = {
       const payload = (await response.json().catch(() => ({}))) as Partial<ApiError>;
       throw new ApiRequestError(response.status, payload);
     }
-    const url = URL.createObjectURL(await response.blob());
+    return response.blob();
+  },
+  /** Fetches a stored file and hands it to the browser as a download. */
+  download: async (path: string, fileName: string) => {
+    const url = URL.createObjectURL(await api.blob(path));
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = fileName;

@@ -7,6 +7,7 @@ import { Panel } from '../components/ui/Panel';
 import { Pill } from '../components/ui/Pill';
 import { formatDisplayDate } from '../lib/format';
 import { useAuth } from '../providers/AuthProvider';
+import { ClockCard } from '../features/attendance/ClockCard';
 import { useBookingSummary } from '../features/bookings/useBookings';
 import { useEmployees } from '../features/people/usePeople';
 
@@ -94,6 +95,8 @@ export function HomePage() {
           </>
         }
       />
+
+      {user?.employeeId && can('attendance.create') && <ClockCard />}
 
       {hasCounts && (
         <MetricRow>

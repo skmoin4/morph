@@ -67,8 +67,20 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'People & Work',
     items: [
       { label: 'People', to: '/people', icon: Users, permission: 'employee.view', ready: true },
-      { label: 'Attendance', to: '/attendance', icon: Fingerprint, permission: 'attendance.view' },
-      { label: 'Shifts', to: '/shifts', icon: CalendarClock, permission: 'shift.view' },
+      {
+        label: 'Attendance',
+        to: '/attendance',
+        icon: Fingerprint,
+        permission: 'attendance.view',
+        ready: true,
+      },
+      {
+        label: 'Shifts',
+        to: '/shifts',
+        icon: CalendarClock,
+        permission: 'shift.view',
+        ready: true,
+      },
       { label: 'Leave', to: '/leave', icon: CalendarDays, permission: 'leave.view' },
       { label: 'Timesheets', to: '/timesheets', icon: Clock, permission: 'timesheet.view' },
     ],

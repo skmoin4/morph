@@ -42,6 +42,7 @@ export interface Office {
   weeklyOffDays: number[];
   allowedIPs: string[];
   requiresGps: boolean;
+  geofenceMode: 'FLAG' | 'REJECT';
   isActive: boolean;
   _count: { employees: number; projects: number };
 }

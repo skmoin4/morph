@@ -97,6 +97,7 @@ const STATUS_TONES: Record<string, PillTone> = {
   ON_LEAVE: 'violet',
   HOLIDAY: 'blue',
   WEEKLY_OFF: 'gray',
+  NOT_IN: 'gray',
 
   // People
   INVITED: 'blue',

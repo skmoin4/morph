@@ -26,6 +26,7 @@ import { formatCurrency, formatDisplayDate, formatHours } from '../lib/format';
 import { formatExclusiveEndInclusive } from '@opsvera/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { useAuth } from '../providers/AuthProvider';
+import { EmployeeAttendancePanel } from '../features/attendance/EmployeeAttendancePanel';
 import { EmployeeFormDrawer } from '../features/people/EmployeeFormDrawer';
 import {
   peopleKeys,
@@ -182,6 +183,7 @@ export function EmployeeDetailPage() {
         tabs={[
           { key: 'overview', label: 'Overview' },
           { key: 'projects', label: 'Projects', count: employee.projects.length },
+          ...(can('attendance.view') ? [{ key: 'attendance', label: 'Attendance' }] : []),
           { key: 'leave', label: 'Leave balance', count: employee.leaveBalances.length },
           ...(canSeeCost ? [{ key: 'cost', label: 'Cost rate history' }] : []),
           ...(canSeeSalary ? [{ key: 'salary', label: 'Salary history' }] : []),
@@ -193,6 +195,10 @@ export function EmployeeDetailPage() {
 
       <TabPanel>
         {tab === 'overview' && <OverviewTab employee={employee} />}
+
+        {tab === 'attendance' && can('attendance.view') && (
+          <EmployeeAttendancePanel employeeId={employee.id} timeZone={employee.office.timezone} />
+        )}
 
         {tab === 'projects' && (
           <Panel title="Current projects" subtitle="Active projects this person is a member of.">

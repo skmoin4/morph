@@ -876,6 +876,15 @@ describe('Attendance (e2e)', () => {
       expect(ann.status).toBe('PRESENT');
     });
 
+    it('lists offices and departments for the filters, and needs attendance.view', async () => {
+      const res = await request(server).get('/api/v1/attendance/lookups').set(as('hr')).expect(200);
+      expect(res.body.offices.map((o: { shortCode: string }) => o.shortCode)).toEqual(
+        expect.arrayContaining(['RUH']),
+      );
+      expect(Array.isArray(res.body.departments)).toBe(true);
+      await request(server).get('/api/v1/attendance/lookups').expect(401);
+    });
+
     it('filters by status and office', async () => {
       const res = await request(server)
         .get(`/api/v1/attendance/board?date=2026-10-13&status=NOT_IN&officeId=${ids.ruh}`)

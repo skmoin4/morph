@@ -77,7 +77,7 @@ export function AttendancePoliciesTab({ canEdit }: { canEdit: boolean }) {
       cell: ({ row }) => <span className="tabular-nums">{row.original.graceMinutes} min</span>,
     },
     {
-      header: 'Half day below',
+      header: 'Half day from',
       accessorKey: 'halfDayBelowHours',
       cell: ({ row }) => (
         <span className="tabular-nums">{Number(row.original.halfDayBelowHours)} h</span>
@@ -302,9 +302,10 @@ function PolicyDialog({
             {...register('earlyExitBeforeMinutes')}
           />
           <TextField
-            label="Half day below (hours)"
+            label="Half day from (hours)"
             type="number"
             step="0.25"
+            hint="Time at work from here up to the full-day minimum is a half day; less is absent."
             error={formState.errors.halfDayBelowHours?.message}
             {...register('halfDayBelowHours')}
           />
@@ -312,6 +313,7 @@ function PolicyDialog({
             label="Full day from (hours)"
             type="number"
             step="0.25"
+            hint="Measured as time clocked in, break included."
             error={formState.errors.fullDayMinimumHours?.message}
             {...register('fullDayMinimumHours')}
           />

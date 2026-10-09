@@ -225,6 +225,7 @@ function OfficeDrawer({
           weeklyOffDays: office.weeklyOffDays,
           allowedIPs: office.allowedIPs,
           requiresGps: office.requiresGps,
+          geofenceMode: office.geofenceMode,
           isActive: office.isActive,
         }
       : {
@@ -235,6 +236,7 @@ function OfficeDrawer({
           weeklyOffDays: [0],
           allowedIPs: [],
           requiresGps: false,
+          geofenceMode: 'FLAG',
           isActive: true,
         },
   });
@@ -387,6 +389,17 @@ function OfficeDrawer({
               {...register('geofenceRadiusM')}
             />
           </div>
+          <SelectField
+            label="A phone punch outside the geofence"
+            containerClassName="mt-3 sm:max-w-sm"
+            hint="Flagged punches are let through and marked for a manager to review; refused ones are not recorded at all."
+            error={errors.geofenceMode?.message}
+            options={[
+              { value: 'FLAG', label: 'Let it through, flagged for review' },
+              { value: 'REJECT', label: 'Refuse the punch' },
+            ]}
+            {...register('geofenceMode')}
+          />
           <label className="mt-3 flex items-start gap-2.5">
             <input
               type="checkbox"

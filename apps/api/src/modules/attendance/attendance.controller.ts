@@ -103,6 +103,13 @@ export class AttendanceController {
 
   // --- Reading -------------------------------------------------------------
 
+  @Get('lookups')
+  @RequirePermissions('attendance.view')
+  @ApiOperation({ summary: 'Offices and departments for the filters' })
+  lookups() {
+    return this.attendance.lookups();
+  }
+
   @Get('board')
   @RequirePermissions('attendance.view')
   @ApiOperation({ summary: 'Live attendance board for a day' })

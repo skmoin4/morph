@@ -44,7 +44,7 @@ const DATE = '2026-10-05'; // a Monday
 const at = (date: string, time: string, tz = IST) => officeLocalToUtc(date, time, tz);
 
 /** A finished Monday: "now" is well after the shift closed. */
-function day(overrides: Partial<DayInput> & { punches?: Array<[string, string, 'IN' | 'OUT']> } = {}) {
+function day(overrides: Partial<Omit<DayInput, 'punches'>> & { punches?: Array<[string, string, 'IN' | 'OUT']> } = {}) {
   const { punches = [], ...rest } = overrides;
   return computeDay({
     date: DATE,
