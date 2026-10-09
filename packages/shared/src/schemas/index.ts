@@ -6,3 +6,4 @@ export * from './rbac';
 export * from './settings';
 export * from './project';
 export * from './attendance';
+export * from './leave';

@@ -48,7 +48,22 @@ PO / work order is **optional**, not mandatory. A verbal booking shows "Email pe
 - **Step 6b – done, approved.** Booking screens and a temporary Home page (see below).
 - **Step 7 – done, awaiting review.** Projects, Project 360, team, milestones, tasks, Kanban (see below).
 - **Step 8 – done, awaiting review.** Shifts, punching, live board, register, regularisation, Excel export (see below).
-- **Next: Step 9** – Leave.
+- **Step 9 – done, awaiting review.** Leave: balances, apply, one- and two-level approval, team calendar (see below).
+- **Next: Step 10** – Timer & timesheets.
+
+### Step 9 – what exists
+
+- **Rules** (`packages/shared/src/leave/rules.ts`, pure and unit-tested): working-day count (weekly offs and holidays are free), half days (0.5, single day only), joiner proration, carry forward, approval stages.
+- **Leave year = calendar year.** A request cannot run across two years (apply once per year). Balance rows are created on the first request; reading a balance never writes. Joiners get the quota for the months left (joining month counted), rounded down to the half day. Carry forward is worked out once, when next year's row is first created, capped by the type's `maxCarryForward`.
+- **Applying:** the form asks the server for a preview (days, what is skipped and why, balance after). Refused: end before start, half day on a multi-day range or a type without half days, all days off, before joining or after the last day, older than 30 days, more than 400 days ahead, overlap with a live request, and — for paid types — more days than the balance. Unpaid types have no balance limit. HR (or anyone whose `leave.create` scope covers the person) can apply on someone's behalf.
+- **Approval:** `leave.approve` within the data scope; never your own. `SINGLE_LEVEL` finishes at the first decision. `TEAM_LEAD_THEN_MANAGER` needs a second decision by a **different** person; someone whose scope is everyone (HR, CEO) can finish it in one go. Reject needs a reason. Out-of-scope requests are 404.
+- **Balances** move inside a transaction that locks the request (or the employee), so two approvers clicking together, or a double tap on Apply, count the days once. Pending → used on approval; back to available on reject or cancel.
+- **Cancel:** the owner can withdraw a waiting request, or an approved one that has not started. After it starts, only an approver can take it back, with a reason.
+- **Attendance:** approving or cancelling rewrites the affected attendance days at once (approved leave shows as On leave, 0.5 for a half day). Days still in the future are filled in as they happen.
+- **Notifications:** approvers get a bell item on apply (and again for the second level); the employee gets one on approve, reject or someone else's cancel.
+- **Screens:** Leave (My leave with balances and requests, Approvals, Team calendar, Balances) and the Apply dialog.
+- **Role matrix fix:** Project Manager and Finance can now apply for their own leave (`leave.create` / `leave.view`, OWN). Re-run `pnpm db:seed` on an existing database to pick this up.
+- **To confirm with the client:** calendar-year leave year (or April–March?); HR finishing a two-level leave alone; the 30-day back-dating window; whether leave should accrue monthly instead of the full quota up front.
 
 ### Step 8 – what exists
 

@@ -15,6 +15,7 @@ import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { TasksPage } from './pages/TasksPage';
 import { AttendancePage } from './pages/AttendancePage';
 import { ShiftsPage } from './pages/ShiftsPage';
+import { LeavePage } from './pages/LeavePage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -28,14 +29,6 @@ const MODULES: Array<{
   step: string;
   permission: string;
 }> = [
-  {
-    path: '/leave',
-    eyebrow: 'People & Work',
-    title: 'Leave',
-    subtitle: 'Balances, requests and the team calendar.',
-    step: 'step 9',
-    permission: 'leave.view',
-  },
   {
     path: '/timesheets',
     eyebrow: 'People & Work',
@@ -149,6 +142,14 @@ export function App() {
                 element={
                   <RequirePermission permission="shift.view">
                     <ShiftsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/leave"
+                element={
+                  <RequirePermission permission="leave.view">
+                    <LeavePage />
                   </RequirePermission>
                 }
               />

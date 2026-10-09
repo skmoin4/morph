@@ -81,7 +81,7 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'shift.view',
         ready: true,
       },
-      { label: 'Leave', to: '/leave', icon: CalendarDays, permission: 'leave.view' },
+      { label: 'Leave', to: '/leave', icon: CalendarDays, permission: 'leave.view', ready: true },
       { label: 'Timesheets', to: '/timesheets', icon: Clock, permission: 'timesheet.view' },
     ],
   },
@@ -131,7 +131,7 @@ export const MOBILE_NAV: NavItem[] = [
   { label: 'My Day', to: '/', icon: LayoutDashboard, permission: 'dashboard.view' },
   { label: 'Attendance', to: '/attendance', icon: Fingerprint, permission: 'attendance.view' },
   { label: 'Timesheets', to: '/timesheets', icon: Clock, permission: 'timesheet.view' },
-  { label: 'Leave', to: '/leave', icon: CalendarDays, permission: 'leave.view' },
+  { label: 'Leave', to: '/leave', icon: CalendarDays, permission: 'leave.view', ready: true },
   { label: 'Team', to: '/people', icon: Users2, permission: 'employee.view' },
 ];
 
