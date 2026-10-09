@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Download, FileCheck2, Mail, Pencil, ShieldCheck, XCircle } from 'lucide-react';
 import { Drawer } from '../../components/ui/Drawer';
@@ -30,6 +31,7 @@ type Overlay = 'edit' | 'confirm' | 'attach' | 'cancel' | 'approve' | 'reject' |
  */
 export function BookingDrawer({ bookingId, onClose }: { bookingId: string; onClose: () => void }) {
   const { can } = useAuth();
+  const navigate = useNavigate();
   const { data: booking, isLoading } = useBooking(bookingId);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const decide = useDecideApproval();
@@ -285,6 +287,15 @@ export function BookingDrawer({ bookingId, onClose }: { bookingId: string; onClo
                   The project carries these terms from the booking. Scheduling, team and tasks are
                   planned on the project itself.
                 </p>
+                {can('project.view') && (
+                  <Button
+                    className="mt-3"
+                    variant="primary"
+                    onClick={() => navigate(`/projects/${booking.project!.id}`)}
+                  >
+                    Open project
+                  </Button>
+                )}
               </Section>
             )}
 

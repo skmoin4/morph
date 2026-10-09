@@ -153,11 +153,12 @@ export interface BookingLookups {
 }
 
 /** Narrow lookups open to anyone who can see bookings (settings.view is not needed). */
-export function useBookingLookups() {
+export function useBookingLookups(enabled = true) {
   return useQuery({
     queryKey: ['bookings', 'lookups'] as const,
     queryFn: () => api.get<BookingLookups>('/bookings/lookups'),
     staleTime: 5 * 60_000,
+    enabled,
   });
 }
 

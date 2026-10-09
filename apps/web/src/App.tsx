@@ -10,6 +10,9 @@ import { UiKitPage } from './pages/UiKitPage';
 import { HomePage } from './pages/HomePage';
 import { ClientsPage } from './pages/ClientsPage';
 import { BookingsPage } from './pages/BookingsPage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { ProjectDetailPage } from './pages/ProjectDetailPage';
+import { TasksPage } from './pages/TasksPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -54,22 +57,6 @@ const MODULES: Array<{
     subtitle: 'Weekly grids, submission and approval.',
     step: 'step 10',
     permission: 'timesheet.view',
-  },
-  {
-    path: '/projects',
-    eyebrow: 'Projects',
-    title: 'Projects',
-    subtitle: 'Schedule, team, cost and margin.',
-    step: 'step 7',
-    permission: 'project.view',
-  },
-  {
-    path: '/tasks',
-    eyebrow: 'Projects',
-    title: 'Tasks',
-    subtitle: 'Kanban and list views.',
-    step: 'step 7',
-    permission: 'task.view',
   },
   {
     path: '/expenses',
@@ -136,6 +123,30 @@ export function App() {
                 element={
                   <RequirePermission permission="booking.view">
                     <BookingsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/projects"
+                element={
+                  <RequirePermission permission="project.view">
+                    <ProjectsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/projects/:id"
+                element={
+                  <RequirePermission permission="project.view">
+                    <ProjectDetailPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/tasks"
+                element={
+                  <RequirePermission permission="task.view">
+                    <TasksPage />
                   </RequirePermission>
                 }
               />

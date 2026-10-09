@@ -45,8 +45,19 @@ PO / work order is **optional**, not mandatory. A verbal booking shows "Email pe
 - **Step 4 – done, approved.** Company & Office Setup, Settings screens; `GET /auth/me` replaces the stub user.
 - **Step 5 – done, approved.** People + Employee 360, cost-rate history, Excel import, scoped/masked CSV export.
 - **Step 6 – done, approved.** Clients and bookings API: confirmation rules, project code generation, configurable booking policy.
-- **Step 6b – done, awaiting review.** Booking screens and a temporary Home page (see below).
-- **Next: Step 7** – Projects, scheduling, milestones, tasks, Kanban, Project 360.
+- **Step 6b – done, approved.** Booking screens and a temporary Home page (see below).
+- **Step 7 – done, awaiting review.** Projects, Project 360, team, milestones, tasks, Kanban (see below).
+- **Next: Step 8** – Shifts and Attendance.
+
+### Step 7 – what exists
+
+- **Projects register** (`/projects`): KPI row, filters, sortable columns, task-progress and hours-burn bars; cost and margin columns only for `cost.view` / `margin.view`. Rows open **Project 360** (`/projects/:id`), a full page rather than the prototype's drawer so the board has room.
+- **Project 360 tabs:** Overview, Booking & confirmation, Schedule (timeline + milestones), Team, Tasks (Kanban board and list). Time, Expenses and Cost ledger are placeholders until steps 10–12; the burn chart arrives with the ledger.
+- **Rules enforced by the API:** a project outside the caller's data scope is a 404; a task can only be assigned to someone on the project team (or its PM); a milestone must fall inside the project dates; a team member with open tasks cannot be removed (they are given a `leftOn`, never deleted); tasks on a cancelled or completed project are read-only; a task with logged time cannot be deleted; an `OWN`-scoped role (Employee) may update only tasks assigned to them and cannot reassign.
+- **Status changes** go through `POST /projects/:id/status` with an allowed-transition table; cancelling needs a reason and is audited. Cancelling a project leaves the booking record unchanged and the code reserved.
+- **Kanban:** native drag-and-drop, optimistic with rollback; every card also has a status menu for keyboard use. Order is a clean 0..n per column, renumbered in a transaction on each drop.
+- **Task files:** drawings, models, documents, sheets and images up to 25 MB; executables and scripts refused; always served as downloads.
+- "Scheduled" (the last lifecycle stage) means the project has at least one milestone or task **and** at least one active team member.
 
 ### Step 6b – what exists
 

@@ -76,8 +76,14 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Projects',
     items: [
-      { label: 'Projects', to: '/projects', icon: ClipboardList, permission: 'project.view' },
-      { label: 'Tasks', to: '/tasks', icon: ListChecks, permission: 'task.view' },
+      {
+        label: 'Projects',
+        to: '/projects',
+        icon: ClipboardList,
+        permission: 'project.view',
+        ready: true,
+      },
+      { label: 'Tasks', to: '/tasks', icon: ListChecks, permission: 'task.view', ready: true },
     ],
   },
   {

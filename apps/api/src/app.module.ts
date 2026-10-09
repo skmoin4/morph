@@ -14,6 +14,7 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { FilesModule } from './modules/files/files.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 import { RequestContextMiddleware } from './common/interceptors/request-id.middleware';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -47,6 +48,7 @@ import { CommonModule } from './common/common.module';
     FilesModule,
     ClientsModule,
     BookingsModule,
+    ProjectsModule,
     HealthModule,
   ],
   providers: [

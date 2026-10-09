@@ -56,7 +56,7 @@ export const clientKeys = {
   detail: (id: string) => ['clients', 'detail', id] as const,
 };
 
-export function useClients(filters: ClientFilters) {
+export function useClients(filters: ClientFilters, enabled = true) {
   return useQuery({
     queryKey: clientKeys.list(filters),
     queryFn: () =>
@@ -68,6 +68,7 @@ export function useClients(filters: ClientFilters) {
         sort: filters.sort,
       }),
     placeholderData: (previous) => previous,
+    enabled,
   });
 }
 
