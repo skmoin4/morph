@@ -714,6 +714,79 @@ describe('Bookings (e2e)', () => {
     });
   });
 
+  describe('register, summary and code preview', () => {
+    it('returns an empty page, not an error, when nothing matches', async () => {
+      const res = await request(server)
+        .get('/api/v1/bookings?q=no-booking-is-called-this')
+        .set(asCeo())
+        .expect(200);
+      expect(res.body.data).toEqual([]);
+      expect(res.body.meta.total).toBe(0);
+    });
+
+    it('combines the confirmation-type and email-pending filters instead of dropping one', async () => {
+      const res = await request(server)
+        .get('/api/v1/bookings?confirmationType=EMAIL&emailPending=true')
+        .set(asCeo())
+        .expect(200);
+      // An EMAIL booking is never "email pending", so the two together match nothing.
+      expect(res.body.data).toEqual([]);
+    });
+
+    it('summarises the register for the KPI row', async () => {
+      const res = await request(server).get('/api/v1/bookings/summary').set(asCeo()).expect(200);
+      for (const key of [
+        'draft',
+        'awaitingApproval',
+        'projectCreated',
+        'cancelled',
+        'activeProjects',
+        'emailPending',
+        'emailOverdue',
+      ]) {
+        expect(typeof res.body[key]).toBe('number');
+      }
+      expect(res.body.emailPending).toBeGreaterThan(0);
+      expect(res.body.bookedThisMonth).toHaveProperty('count');
+    });
+
+    it('previews the next code without consuming a number', async () => {
+      const id = await makeBooking({ bookingDate: '2026-09-01' });
+      const first = await request(server)
+        .get(`/api/v1/bookings/${id}/code-preview`)
+        .set(asCeo())
+        .expect(200);
+      const second = await request(server)
+        .get(`/api/v1/bookings/${id}/code-preview`)
+        .set(asCeo())
+        .expect(200);
+      expect(first.body.code).toMatch(/^BTC-26-27-HOS-\d{4}$/);
+      expect(second.body.code).toBe(first.body.code);
+      expect(first.body.issued).toBe(false);
+
+      const confirmed = await request(server)
+        .post(`/api/v1/bookings/${id}/confirm`)
+        .set(asCeo())
+        .send({ confirmation: verbalConfirmation })
+        .expect(201);
+      // The preview was a forecast; with nobody else confirming, it came true.
+      expect(confirmed.body.generatedProjectCode).toBe(first.body.code);
+    });
+
+    it('serves offices and project types to anyone who can open the register', async () => {
+      const res = await request(server).get('/api/v1/bookings/lookups').set(asCeo()).expect(200);
+      expect(res.body.offices.map((o: { shortCode: string }) => o.shortCode)).toContain('HQ');
+      expect(res.body.projectTypes.map((t: { shortCode: string }) => t.shortCode)).toEqual(
+        expect.arrayContaining(['HOS', 'DC']),
+      );
+      await request(server).get('/api/v1/bookings/lookups').set(asLead()).expect(403);
+    });
+
+    it('refuses the summary to a role without booking.view', async () => {
+      await request(server).get('/api/v1/bookings/summary').set(asLead()).expect(403);
+    });
+  });
+
   describe('permissions', () => {
     it('refuses a Team Lead the confirm endpoint', async () => {
       const id = await makeBooking();

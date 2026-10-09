@@ -24,6 +24,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** The permission that reveals this item. The sidebar hides what is not granted. */
   permission: string;
+  /** False until the module's screens exist; the Home page marks these "Soon". */
+  ready?: boolean;
 }
 
 export interface NavGroup {
@@ -51,14 +53,20 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Commercial',
     items: [
-      { label: 'Clients', to: '/clients', icon: Briefcase, permission: 'client.view' },
-      { label: 'Bookings', to: '/bookings', icon: FileText, permission: 'booking.view' },
+      { label: 'Clients', to: '/clients', icon: Briefcase, permission: 'client.view', ready: true },
+      {
+        label: 'Bookings',
+        to: '/bookings',
+        icon: FileText,
+        permission: 'booking.view',
+        ready: true,
+      },
     ],
   },
   {
     label: 'People & Work',
     items: [
-      { label: 'People', to: '/people', icon: Users, permission: 'employee.view' },
+      { label: 'People', to: '/people', icon: Users, permission: 'employee.view', ready: true },
       { label: 'Attendance', to: '/attendance', icon: Fingerprint, permission: 'attendance.view' },
       { label: 'Shifts', to: '/shifts', icon: CalendarClock, permission: 'shift.view' },
       { label: 'Leave', to: '/leave', icon: CalendarDays, permission: 'leave.view' },
@@ -89,7 +97,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ShieldCheck,
         permission: 'role.view',
       },
-      { label: 'Settings', to: '/settings', icon: Settings, permission: 'settings.view' },
+      {
+        label: 'Settings',
+        to: '/settings',
+        icon: Settings,
+        permission: 'settings.view',
+        ready: true,
+      },
     ],
   },
 ];

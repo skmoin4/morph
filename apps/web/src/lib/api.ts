@@ -90,6 +90,7 @@ async function refreshAccessToken(): Promise<boolean> {
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, query, skipRefresh, headers, ...rest } = options;
 
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const url = new URL(`${BASE_URL}${path}`);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== null && value !== '') {
@@ -101,11 +102,13 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     ...rest,
     credentials: 'include',
     headers: {
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      // A FormData body sets its own multipart boundary; forcing a JSON
+      // content type on it would break the upload.
+      ...(body === undefined || isForm ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
   });
 
   // An expired access token is routine — refresh once and replay.
@@ -135,4 +138,30 @@ export const api = {
   put: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
+  /** Fetches a stored file with the bearer token and hands it to the browser as a download. */
+  download: async (path: string, fileName: string) => {
+    const fetchOnce = () =>
+      fetch(`${BASE_URL}${path}`, {
+        credentials: 'include',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+    let response = await fetchOnce();
+    if (response.status === 401 && (await refreshAccessToken())) response = await fetchOnce();
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as Partial<ApiError>;
+      throw new ApiRequestError(response.status, payload);
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
+  /** Multipart upload of a single file under the field name `file`. */
+  upload: <T>(path: string, file: File, query?: RequestOptions['query']) => {
+    const form = new FormData();
+    form.append('file', file);
+    return apiFetch<T>(path, { method: 'POST', body: form, query });
+  },
 };

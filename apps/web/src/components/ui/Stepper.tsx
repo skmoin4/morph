@@ -32,12 +32,26 @@ export interface StepperProps {
   currentIndex: number;
   /** Renders the whole stepper in a muted, struck-through state. */
   cancelled?: boolean;
+  /** Drops the descriptions so the stepper fits inside a drawer. */
+  compact?: boolean;
   className?: string;
 }
 
-export function Stepper({ steps, currentIndex, cancelled = false, className }: StepperProps) {
+export function Stepper({
+  steps,
+  currentIndex,
+  cancelled = false,
+  compact = false,
+  className,
+}: StepperProps) {
   return (
-    <ol className={cn('grid gap-2 sm:grid-cols-2 lg:grid-cols-5', className)}>
+    <ol
+      className={cn(
+        'grid gap-2',
+        compact ? 'grid-cols-2 sm:grid-cols-5' : 'sm:grid-cols-2 lg:grid-cols-5',
+        className,
+      )}
+    >
       {steps.map((step, index) => {
         const complete = !cancelled && index < currentIndex;
         const current = !cancelled && index === currentIndex;
@@ -80,7 +94,7 @@ export function Stepper({ steps, currentIndex, cancelled = false, className }: S
                 {step.label}
               </span>
             </div>
-            {step.description && (
+            {step.description && !compact && (
               <p className="mt-1.5 pl-7 text-micro leading-relaxed tracking-normal text-muted">
                 {step.description}
               </p>

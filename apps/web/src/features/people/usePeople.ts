@@ -95,7 +95,8 @@ export const peopleKeys = {
   salaries: (id: string) => ['people', 'salaries', id] as const,
 };
 
-export function useEmployees(filters: PeopleFilters) {
+/** `enabled: false` for callers who may not hold employee.view — the API would answer 403. */
+export function useEmployees(filters: PeopleFilters, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: peopleKeys.list(filters),
     queryFn: () =>
@@ -111,6 +112,7 @@ export function useEmployees(filters: PeopleFilters) {
     // Keeps the previous page on screen while the next one loads, so the
     // table does not flash empty on every filter change.
     placeholderData: (previous) => previous,
+    enabled: options.enabled ?? true,
   });
 }
 

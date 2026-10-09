@@ -81,16 +81,28 @@ export class BookingsService {
   // Read
   // -------------------------------------------------------------------------
 
-  async list(query: BookingListQuery) {
+  async list(query: BookingListQuery, user: AuthenticatedUser) {
     const where: Prisma.BookingWhereInput = {
       deletedAt: null,
       ...(query.status ? { status: query.status as BookingStatus } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.officeId ? { officeId: query.officeId } : {}),
       ...(query.projectTypeId ? { projectTypeId: query.projectTypeId } : {}),
-      ...(query.confirmationType ? { confirmation: { type: query.confirmationType } } : {}),
-      // "Email pending": confirmed verbally, email not attached yet.
-      ...(query.emailPending ? { confirmation: { type: 'VERBAL', emailDocumentId: null } } : {}),
+      // Both filters are ANDed: spreading the same `confirmation` key twice
+      // would let the later one silently replace the earlier.
+      ...(query.confirmationType || query.emailPending
+        ? {
+            AND: [
+              ...(query.confirmationType
+                ? [{ confirmation: { type: query.confirmationType } }]
+                : []),
+              // "Email pending": confirmed verbally, email not attached yet.
+              ...(query.emailPending
+                ? [{ confirmation: { type: 'VERBAL' as const, emailDocumentId: null } }]
+                : []),
+            ],
+          }
+        : {}),
       ...(query.from || query.to
         ? {
             bookingDate: {
@@ -124,7 +136,9 @@ export class BookingsService {
       this.prisma.scoped.booking.count({ where }),
     ]);
 
-    const graceDays = (await this.policy(rows[0]?.companyId ?? '')).verbalEmailGraceDays;
+    // From the caller's own company, not from the first row — an empty page
+    // (no bookings yet, or filters that match nothing) has no row to read it from.
+    const graceDays = (await this.policy(user.companyId)).verbalEmailGraceDays;
 
     return {
       data: rows.map((row) => this.decorate(row, graceDays)),
@@ -135,6 +149,127 @@ export class BookingsService {
         totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
       },
     };
+  }
+
+  /**
+   * Offices and project types for the register's filters and the booking form.
+   *
+   * The settings endpoints need `settings.view`, which a Project Manager does
+   * not have — yet they can open the register. This is the narrow read they
+   * need, and nothing more.
+   */
+  async lookups() {
+    const [offices, projectTypes] = await Promise.all([
+      this.prisma.scoped.office.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, shortCode: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.scoped.projectType.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, shortCode: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    return { offices, projectTypes };
+  }
+
+  /** Headline counts for the register's KPI row and the Home page. */
+  async summary(user: AuthenticatedUser) {
+    const policy = await this.policy(user.companyId);
+    const live = { deletedAt: null };
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+
+    const [draft, awaitingApproval, projectCreated, cancelled, activeProjects, bookedThisMonth] =
+      await Promise.all([
+        this.prisma.scoped.booking.count({ where: { ...live, status: BookingStatus.DRAFT } }),
+        this.prisma.scoped.booking.count({
+          where: { ...live, status: BookingStatus.CONFIRMED, approvalStatus: 'PENDING' },
+        }),
+        this.prisma.scoped.booking.count({
+          where: { ...live, status: BookingStatus.PROJECT_CREATED },
+        }),
+        this.prisma.scoped.booking.count({ where: { ...live, status: BookingStatus.CANCELLED } }),
+        this.prisma.scoped.booking.count({
+          where: { ...live, status: BookingStatus.PROJECT_CREATED, project: { status: 'ACTIVE' } },
+        }),
+        this.prisma.scoped.booking.aggregate({
+          where: {
+            ...live,
+            status: { not: BookingStatus.CANCELLED },
+            bookingDate: { gte: monthStart },
+          },
+          _count: true,
+          _sum: { projectValue: true },
+        }),
+      ]);
+
+    const pending = await this.prisma.scoped.booking.findMany({
+      where: {
+        ...live,
+        status: { not: BookingStatus.CANCELLED },
+        confirmation: { type: 'VERBAL', emailDocumentId: null },
+      },
+      select: { confirmation: { select: { confirmedOn: true } } },
+    });
+    const emailPending = pending.length;
+    const emailOverdue =
+      policy.verbalEmailGraceDays > 0
+        ? pending.filter((row) => {
+            const on = row.confirmation?.confirmedOn;
+            return on && (Date.now() - on.getTime()) / 86_400_000 > policy.verbalEmailGraceDays;
+          }).length
+        : 0;
+
+    return {
+      draft,
+      awaitingApproval,
+      projectCreated,
+      cancelled,
+      activeProjects,
+      emailPending,
+      emailOverdue,
+      bookedThisMonth: {
+        count: bookedThisMonth._count,
+        // Stripped by the masking interceptor without `project.value.view`.
+        projectValue: bookedThisMonth._sum.projectValue?.toString() ?? '0',
+      },
+      requiresApproval: policy.requiresApproval,
+    };
+  }
+
+  /**
+   * What the next project code would look like, without consuming a number.
+   *
+   * Only a preview: another booking may be confirmed first, so the code a
+   * confirmation actually issues can differ. The UI says so.
+   */
+  async codePreview(id: string, user: AuthenticatedUser) {
+    const booking = await this.requireBooking(id);
+    const policy = await this.policy(user.companyId);
+    const projectType = await this.prisma.scoped.projectType.findFirstOrThrow({
+      where: { id: booking.projectTypeId },
+    });
+
+    if (booking.generatedProjectCode) {
+      return {
+        code: booking.generatedProjectCode,
+        issued: true,
+        requiresApproval: policy.requiresApproval,
+      };
+    }
+
+    const code = await this.codes.preview(this.prisma.scoped, {
+      companyId: user.companyId,
+      codePrefix: policy.codePrefix,
+      pattern: policy.pattern,
+      fyStartMonth: policy.fyStartMonth,
+      bookingDate: booking.bookingDate.toISOString().slice(0, 10),
+      typeShortCode: projectType.shortCode,
+    });
+    return { code, issued: false, requiresApproval: policy.requiresApproval };
   }
 
   async findOne(id: string, user: AuthenticatedUser) {

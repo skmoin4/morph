@@ -7,6 +7,9 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PeoplePage } from './pages/PeoplePage';
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage';
 import { UiKitPage } from './pages/UiKitPage';
+import { HomePage } from './pages/HomePage';
+import { ClientsPage } from './pages/ClientsPage';
+import { BookingsPage } from './pages/BookingsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -20,22 +23,6 @@ const MODULES: Array<{
   step: string;
   permission: string;
 }> = [
-  {
-    path: '/clients',
-    eyebrow: 'Commercial',
-    title: 'Clients',
-    subtitle: 'Clients and their contacts.',
-    step: 'step 6',
-    permission: 'client.view',
-  },
-  {
-    path: '/bookings',
-    eyebrow: 'Commercial Handover',
-    title: 'Bookings',
-    subtitle: 'A confirmed booking is the gateway to a project code.',
-    step: 'step 6',
-    permission: 'booking.view',
-  },
   {
     path: '/attendance',
     eyebrow: 'People & Work',
@@ -121,18 +108,34 @@ const MODULES: Array<{
 export function App() {
   return (
     <AppProviders>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedShell />}>
-              <Route index element={<Navigate to="/settings" replace />} />
+              <Route index element={<HomePage />} />
               <Route path="/ui-kit" element={<UiKitPage />} />
               <Route
                 path="/settings"
                 element={
                   <RequirePermission permission="settings.view">
                     <SettingsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/clients"
+                element={
+                  <RequirePermission permission="client.view">
+                    <ClientsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/bookings"
+                element={
+                  <RequirePermission permission="booking.view">
+                    <BookingsPage />
                   </RequirePermission>
                 }
               />

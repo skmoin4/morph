@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Sidebar } from './Sidebar';
 import { TopBar, type RunningTimer } from './TopBar';
@@ -42,6 +43,7 @@ export function AppShell({
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     try {
@@ -72,7 +74,7 @@ export function AppShell({
           timer={timer}
           onOpenSearch={openPalette}
           onOpenMobileNav={() => setMobileOpen(true)}
-          onQuickAction={() => toast('Quick actions arrive with the modules.')}
+          onQuickAction={openPalette}
           onOpenNotifications={() => toast('Notifications arrive in step 14.')}
           onSignOut={onSignOut}
         />
@@ -92,7 +94,7 @@ export function AppShell({
             label: 'New booking',
             section: 'Quick actions',
             permission: 'booking.create',
-            run: () => toast('Booking form arrives in step 6.'),
+            run: () => navigate('/bookings?new=1'),
           },
           {
             id: 'action:start-timer',

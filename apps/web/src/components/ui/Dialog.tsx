@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import { useLatest, useOverlayLayer } from '../../lib/layers';
 import { Button } from './Button';
 
 export interface DialogProps {
@@ -25,6 +26,10 @@ export function Dialog({
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const isTopLayer = useOverlayLayer(open);
+  // Parents pass inline callbacks; reading through a ref keeps the effect from
+  // re-running (and stealing focus) on every keystroke in a form inside.
+  const onCloseRef = useLatest(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +40,7 @@ export function Dialog({
     panelRef.current?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && isTopLayer()) onCloseRef.current();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => {
@@ -43,7 +48,7 @@ export function Dialog({
       document.body.style.overflow = overflow;
       restoreFocusRef.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open, isTopLayer, onCloseRef]);
 
   if (!open) return null;
 

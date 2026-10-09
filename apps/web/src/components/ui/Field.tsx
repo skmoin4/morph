@@ -199,6 +199,14 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
   },
 );
 
+const SELECT_CHEVRON = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7890' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+  backgroundSize: '16px',
+} as const;
+
 export interface SelectFieldProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'id'> {
   label: string;
   hint?: ReactNode;
@@ -242,12 +250,14 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
           required={required}
           className={cn(
             CONTROL_BASE,
-            'h-[38px] cursor-pointer appearance-none bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-9',
-            // Inline chevron so the control does not need a wrapper element.
-            "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7890' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")]",
+            'h-[38px] cursor-pointer appearance-none pr-9',
             error ? CONTROL_STATE.error : CONTROL_STATE.normal,
             className,
           )}
+          // The chevron is an inline style, not utility classes: tailwind-merge
+          // reads the arbitrary bg-[…] values as one group and drops the
+          // surface colour and the position, leaving a grey select with no arrow.
+          style={SELECT_CHEVRON}
           {...props}
         >
           {placeholder && <option value="">{placeholder}</option>}

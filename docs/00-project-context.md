@@ -42,7 +42,19 @@ PO / work order is **optional**, not mandatory. A verbal booking shows "Email pe
 - **Step 1 – done.** Monorepo, Prisma schema (45 tables), seed, tests.
 - **Step 2 – done.** Auth (JWT + rotating refresh tokens with theft detection), tenancy, RBAC, audit log, rate limit.
 - **Step 3 – done, approved.** App shell + `/ui-kit`.
-- **Next: Step 4** – Company & Office Setup, Settings; replace the stubbed user in `App.tsx` with `GET /auth/me`.
+- **Step 4 – done, approved.** Company & Office Setup, Settings screens; `GET /auth/me` replaces the stub user.
+- **Step 5 – done, approved.** People + Employee 360, cost-rate history, Excel import, scoped/masked CSV export.
+- **Step 6 – done, approved.** Clients and bookings API: confirmation rules, project code generation, configurable booking policy.
+- **Step 6b – done, awaiting review.** Booking screens and a temporary Home page (see below).
+- **Next: Step 7** – Projects, scheduling, milestones, tasks, Kanban, Project 360.
+
+### Step 6b – what exists
+
+- **Clients:** list, add/edit drawer, detail drawer (contacts, recent bookings).
+- **Bookings register:** KPI row, filters (status, client, office, type, confirmation, date range), sortable columns, "Email pending" and "Email overdue" badges. `GET /bookings/summary` feeds the KPIs and Home; `GET /bookings/lookups` supplies offices/project types to roles without `settings.view`.
+- **Booking flow:** new booking drawer → booking drawer (lifecycle stepper, terms, proof, actions) → confirmation drawer (email upload or verbal note, optional PO) → confirm dialog with the project-code preview. Approval, attach-email-later and cancel (blocked once a project exists, pointing at the project) are dialogs on the booking drawer.
+- **Home (temporary, `/`):** greeting, role, counts the user may see (employees, active bookings, projects, emails pending), a "Needs attention" list, and quick links to permitted modules. Unbuilt modules show "Coming in a later step". Replaced by the real dashboards in step 13.
+- The code shown in the confirm dialog is a forecast, not a reservation: the number is taken at the moment of confirmation, so a concurrent confirmation can shift it by one.
 
 Approved schema / design deviations:
 - Ledger unique key `(sourceType, sourceId, projectId, postingVersion, isReversal)`; append-only, reopen writes a negative reversal row.
@@ -53,8 +65,9 @@ Approved schema / design deviations:
 
 ## 6. Open items
 
-- **MySQL keeps stopping** during sessions – check the `.err` log in the datadir and find the cause before step 4. Do not change MySQL config without asking.
-- **To confirm with client** (keep these configurable until then): who can create / confirm bookings and whether booking needs approval; exact project code format and project type list; whether a verbal booking must later get an email; what happens to a project if a booking is cancelled; whether "schedule" means milestones only or a Gantt.
+- **MySQL keeps stopping** during sessions – check the `.err` log in the datadir and find the cause. Do not change MySQL config without asking.
+- **Booking rules not yet confirmed by the client** – all are stored on `companies` and enforced by the API, with permissive defaults: `bookingCreateRoleIds`, `bookingConfirmRoleIds` (empty = the permission alone decides), `bookingRequiresApproval` (off), `verbalEmailGraceDays` (reminder only, never blocking). **There is no Settings screen for these yet** – today they change through the company settings API only.
+- **Still to confirm with the client:** exact project code format and project type list; whether "schedule" means milestones only or a Gantt.
 - Payroll depth, Zoho accounting scope, desktop monitoring and biometric device are later-phase questions.
 
 ## 7. Working rules

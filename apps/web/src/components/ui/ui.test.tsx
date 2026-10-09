@@ -225,3 +225,30 @@ describe('sidebar permissions', () => {
     expect(screen.queryByRole('link', { name: /^people$/i })).toBeNull();
   });
 });
+
+describe('stacked overlays', () => {
+  it('closes only the top overlay on Escape', async () => {
+    const closeDrawer = vi.fn();
+    const closeDialog = vi.fn();
+    render(
+      <>
+        <Drawer open onClose={closeDrawer} title="Booking">
+          body
+        </Drawer>
+        <ConfirmDialog
+          open
+          onClose={closeDialog}
+          onConfirm={() => undefined}
+          title="Confirm?"
+          description="Sure?"
+        />
+      </>,
+    );
+
+    await userEvent.keyboard('{Escape}');
+
+    // The dialog was opened last, so it owns the keyboard.
+    expect(closeDialog).toHaveBeenCalledTimes(1);
+    expect(closeDrawer).not.toHaveBeenCalled();
+  });
+});

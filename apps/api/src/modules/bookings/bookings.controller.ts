@@ -30,8 +30,33 @@ export class BookingsController {
   @Get()
   @RequirePermissions('booking.view')
   @ApiOperation({ summary: 'Booking register, filterable by status and "email pending"' })
-  list(@Query(new ZodValidationPipe(bookingListQuerySchema)) query: BookingListQuery) {
-    return this.bookings.list(query);
+  list(
+    @Query(new ZodValidationPipe(bookingListQuerySchema)) query: BookingListQuery,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.bookings.list(query, user);
+  }
+
+  // Declared before `:id` so "summary" is not read as a booking id.
+  @Get('summary')
+  @RequirePermissions('booking.view')
+  @ApiOperation({ summary: 'Headline booking counts: drafts, email pending, active projects…' })
+  summary(@CurrentUser() user: AuthenticatedUser) {
+    return this.bookings.summary(user);
+  }
+
+  @Get('lookups')
+  @RequirePermissions('booking.view')
+  @ApiOperation({ summary: 'Offices and project types for filters and the booking form' })
+  lookups() {
+    return this.bookings.lookups();
+  }
+
+  @Get(':id/code-preview')
+  @RequirePermissions('booking.view')
+  @ApiOperation({ summary: 'The project code this booking would receive, without consuming it' })
+  codePreview(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.bookings.codePreview(id, user);
   }
 
   @Get(':id')

@@ -22,8 +22,8 @@ export function PlaceholderPage({
       <PageHeader eyebrow={eyebrow} title={title} subtitle={subtitle} />
       <Panel>
         <EmptyState
-          title={`${title} arrives in ${step}`}
-          description="The app shell is in review first — modules follow once the UI kit is signed off."
+          title="Coming in a later step"
+          description={`${title} is planned for ${step}. Nothing is missing — it will appear here when it is built.`}
         />
       </Panel>
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import { useLatest, useOverlayLayer } from '../../lib/layers';
 import { IconButton } from './Button';
 
 export interface DrawerProps {
@@ -34,6 +35,10 @@ export function Drawer({
 }: DrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const isTopLayer = useOverlayLayer(open);
+  // Parents pass inline callbacks; reading through a ref keeps the effect from
+  // re-running (and stealing focus) on every keystroke in a form inside.
+  const onCloseRef = useLatest(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -46,9 +51,11 @@ export function Drawer({
     panel?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
+      // A dialog opened over this drawer owns the keyboard until it closes.
+      if (!isTopLayer()) return;
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || !panel) return;
@@ -75,7 +82,7 @@ export function Drawer({
       document.body.style.overflow = overflow;
       restoreFocusRef.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open, isTopLayer, onCloseRef]);
 
   if (!open) return null;
 
