@@ -44,6 +44,6 @@ const queueImports: DynamicModule[] = jobsEnabled
     ShiftsService,
     ...(jobsEnabled ? [AttendanceJobs, AttendanceProcessor] : []),
   ],
-  exports: [AttendanceService, AttendanceContextLoader],
+  exports: [AttendanceService, AttendanceContextLoader, RegularisationService],
 })
 export class AttendanceModule {}
