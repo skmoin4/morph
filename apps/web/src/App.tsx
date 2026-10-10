@@ -19,6 +19,7 @@ import { LeavePage } from './pages/LeavePage';
 import { TimesheetsPage } from './pages/TimesheetsPage';
 import { ExpensesPage } from './pages/ExpensesPage';
 import { ProjectCostPage } from './pages/ProjectCostPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -32,14 +33,6 @@ const MODULES: Array<{
   step: string;
   permission: string;
 }> = [
-  {
-    path: '/reports',
-    eyebrow: 'Insights',
-    title: 'Reports',
-    subtitle: 'Filtered reports with Excel export.',
-    step: 'step 13',
-    permission: 'report.view',
-  },
   {
     path: '/roles',
     eyebrow: 'Admin',
@@ -188,6 +181,14 @@ export function App() {
                   }
                 />
               ))}
+              <Route
+                path="reports"
+                element={
+                  <RequirePermission permission="report.view">
+                    <ReportsPage />
+                  </RequirePermission>
+                }
+              />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

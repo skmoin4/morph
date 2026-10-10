@@ -60,7 +60,7 @@ describe('CommandPalette', () => {
 
   it('offers navigation for permitted modules only', () => {
     renderPalette();
-    expect(screen.getByRole('option', { name: /executive dashboard/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /bookings/i })).toBeInTheDocument();
     // No settings.view permission.
     expect(screen.queryByRole('option', { name: /^settings/i })).toBeNull();
@@ -78,7 +78,7 @@ describe('CommandPalette', () => {
 
     await userEvent.type(input, 'book');
     expect(screen.getByRole('option', { name: /new booking/i })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: /executive dashboard/i })).toBeNull();
+    expect(screen.queryByRole('option', { name: /^dashboard/i })).toBeNull();
 
     await userEvent.clear(input);
     await userEvent.type(input, 'zzzzz');

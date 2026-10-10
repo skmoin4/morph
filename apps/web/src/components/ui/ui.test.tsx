@@ -219,7 +219,7 @@ describe('sidebar permissions', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: /executive dashboard/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^dashboard$/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /bookings/i })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /roles & permissions/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /^people$/i })).toBeNull();
