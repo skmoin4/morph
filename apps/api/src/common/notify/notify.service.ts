@@ -61,7 +61,7 @@ export class NotifyService {
     subjectEmployeeId: string,
     type: NotificationType,
     note: Note,
-    options: { exceptEmployeeId?: string } = {},
+    options: { exceptEmployeeId?: string; excludeRoleKeys?: string[] } = {},
   ): Promise<number> {
     const holders = await this.prisma.scoped.user.findMany({
       where: {
@@ -75,6 +75,7 @@ export class NotifyService {
         employee: { select: { id: true, officeId: true } },
         role: {
           select: {
+            systemKey: true,
             permissions: {
               where: { permission: { key: permissionKey } },
               select: { dataScope: true },
@@ -88,6 +89,7 @@ export class NotifyService {
     for (const holder of holders) {
       const me = holder.employee;
       if (!me || me.id === subjectEmployeeId || me.id === options.exceptEmployeeId) continue;
+      if (holder.role.systemKey && options.excludeRoleKeys?.includes(holder.role.systemKey)) continue;
       const dataScope = (holder.role.permissions[0]?.dataScope ?? DataScope.OWN) as DataScope;
       const ids = await this.scope.visibleEmployeeIds(
         { employeeId: me.id, officeId: me.officeId } as AuthenticatedUser,

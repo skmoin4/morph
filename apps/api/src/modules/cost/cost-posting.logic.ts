@@ -376,6 +376,53 @@ export async function postExpenseCost(
   return { version };
 }
 
+/**
+ * Reverses the posted expense: a mirror-image negative row, and the project
+ * actuals backed out. Returns false when nothing live was posted.
+ */
+export async function reverseExpenseCost(
+  tx: TxClient,
+  args: { companyId: string; expenseId: string; reason: string; createdById?: string | null },
+): Promise<{ version: number; reversed: boolean }> {
+  const version = await activePostingVersion(tx, 'EXPENSE', args.expenseId);
+  if (version === null) return { version: 0, reversed: false };
+
+  const original = await tx.costLedgerEntry.findFirstOrThrow({
+    where: {
+      sourceType: 'EXPENSE',
+      sourceId: args.expenseId,
+      postingVersion: version,
+      isReversal: false,
+    },
+  });
+  const amount = new Decimal(original.amount.toString()).negated();
+
+  await tx.costLedgerEntry.create({
+    data: {
+      companyId: original.companyId,
+      projectId: original.projectId,
+      employeeId: original.employeeId,
+      sourceType: 'EXPENSE',
+      sourceId: args.expenseId,
+      postingVersion: version,
+      isReversal: true,
+      postingDate: original.postingDate,
+      amount: amount.toFixed(2),
+      description: `Reversal of v${version}: ${args.reason}`,
+      reversesId: original.id,
+      createdById: args.createdById ?? null,
+    },
+  });
+  await tx.project.update({
+    where: { id: original.projectId },
+    data: {
+      actualExpenseCost: { increment: amount.toFixed(2) },
+      actualTotalCost: { increment: amount.toFixed(2) },
+    },
+  });
+  return { version, reversed: true };
+}
+
 /** Net posted cost for a source: live versions minus reversals. */
 export async function netPostedAmount(
   tx: TxClient,

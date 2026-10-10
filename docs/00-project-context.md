@@ -50,7 +50,23 @@ PO / work order is **optional**, not mandatory. A verbal booking shows "Email pe
 - **Step 8 – done, awaiting review.** Shifts, punching, live board, register, regularisation, Excel export (see below).
 - **Step 9 – done, awaiting review.** Leave: balances, apply, one- and two-level approval, team calendar (see below).
 - **Step 10 – done, awaiting review.** Timer, manual time, weekly grid, submission, approval with cost posting, reopen (see below).
-- **Next: Step 11** – Expenses with two-step approval.
+- **Step 11 – done, awaiting review.** Expenses: claims with receipts, category limits, manager → Finance approval, cost posting, reimbursement, reversal (see below).
+- **Next: Step 12** – Cost ledger screens and budget alerts.
+
+### Step 11 – what exists
+
+- **Rules** (`packages/shared/src/expense/rules.ts`, pure and unit-tested): limit checks, receipt sniffing (JPEG/PNG/WebP/PDF by their first bytes), 90-day claim window, editable states.
+- **Claims:** category, amount (₹, two decimals), date (not future, up to 90 days back), optional project (you must be on its team; cancelled projects take none), billable flag, note, receipt. Saved as a draft, then submitted. Drafts are private to their author, receipt included. A claim with the same date, category and amount as another live one gets a warning, not a block.
+- **Receipts:** photo or PDF up to 10 MB, judged by the file's bytes rather than its name; a receipt can be attached once, by the person who uploaded it. The entry form has "Take a photo" (opens the camera on a phone) and "Choose a file". A category set to "requires receipt" cannot be submitted without one.
+- **Limits warn, never block.** Over the per-claim limit, or a month's total in that category over the monthly limit (counting the person's other waiting or approved claims), and the claim is flagged for the approvers with the reason.
+- **Approval:** step 1 is anyone with `expense.approve` whose scope reaches the claimant (team lead, project manager, CEO) — *except the Finance role*; step 2 needs `expense.reimburse` as well (Finance, CEO) and must be a **different person** from step 1. Nobody decides their own claim. Either step can reject with a reason; the employee corrects and resubmits (a fresh approval; the earlier decision stays in the audit log). The owner can withdraw until the manager has decided. Out-of-scope claims are 404. Bulk approve/reject reports each claim.
+- **Final approval posts to the cost ledger** (exactly once, row-locked) as project cost on the expense date — only if the claim has a project; a claim with no project is approved but is company overhead. Project `actualExpenseCost` moves with it.
+- **Reimbursement:** Finance marks approved claims paid (single or bulk); the employee is told.
+- **Reversal:** Finance can take back an approved claim *before it is paid*: a mirror-image negative ledger row, project actuals backed out, the claim returns to the employee as rejected, reason audited. A paid claim cannot be reversed in the app. The ledger stays append-only (approve → reverse → approve posts version 2).
+- **Screens:** Expenses (My expenses with totals, Approvals with bulk actions and a review drawer showing the receipt, Reimbursements for Finance, Excel export), Project 360 → Expenses, a "New expense" quick action and an Expenses tab on the phone's bottom bar (it replaced "Team" there; Team stays in the menu).
+- **Notifications:** approvers get a bell item on submit (managers first, Finance only when it reaches them); the employee on approve, reject, payout or reversal.
+- **Role matrix:** Project Manager can now claim their own expenses. Re-run `pnpm db:seed` on an existing database to pick this up.
+- **To confirm with the client:** 90-day claim window; Finance cannot take the manager step; a claim with no project is overhead and posts nothing; the claim posts on the expense date (not the approval date); paid claims cannot be reversed in the app.
 
 ### Step 10 – what exists
 

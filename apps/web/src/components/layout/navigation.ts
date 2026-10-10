@@ -15,7 +15,6 @@ import {
   Settings,
   ShieldCheck,
   Users,
-  Users2,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -107,7 +106,13 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Money',
     items: [
-      { label: 'Expenses', to: '/expenses', icon: Banknote, permission: 'expense.view' },
+      {
+        label: 'Expenses',
+        to: '/expenses',
+        icon: Banknote,
+        permission: 'expense.view',
+        ready: true,
+      },
       { label: 'Project Cost', to: '/project-cost', icon: Coins, permission: 'cost.view' },
     ],
   },
@@ -144,7 +149,13 @@ export const MOBILE_NAV: NavItem[] = [
     ready: true,
   },
   { label: 'Leave', to: '/leave', icon: CalendarDays, permission: 'leave.view', ready: true },
-  { label: 'Team', to: '/people', icon: Users2, permission: 'employee.view' },
+  {
+    label: 'Expenses',
+    to: '/expenses',
+    icon: Banknote,
+    permission: 'expense.view',
+    ready: true,
+  },
 ];
 
 /** Hides what a role cannot open. The backend is what actually enforces it. */

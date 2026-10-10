@@ -112,6 +112,13 @@ export function AppShell({
             run: () => setStartingTimer(true),
           },
           {
+            id: 'action:new-expense',
+            label: 'New expense',
+            section: 'Quick actions',
+            permission: 'expense.create',
+            run: () => navigate('/expenses?new=1'),
+          },
+          {
             id: 'action:apply-leave',
             label: 'Apply for leave',
             section: 'Quick actions',

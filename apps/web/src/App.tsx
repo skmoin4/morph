@@ -17,6 +17,7 @@ import { AttendancePage } from './pages/AttendancePage';
 import { ShiftsPage } from './pages/ShiftsPage';
 import { LeavePage } from './pages/LeavePage';
 import { TimesheetsPage } from './pages/TimesheetsPage';
+import { ExpensesPage } from './pages/ExpensesPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -30,14 +31,6 @@ const MODULES: Array<{
   step: string;
   permission: string;
 }> = [
-  {
-    path: '/expenses',
-    eyebrow: 'Money',
-    title: 'Expenses',
-    subtitle: 'Claims through manager then finance approval.',
-    step: 'step 11',
-    permission: 'expense.view',
-  },
   {
     path: '/project-cost',
     eyebrow: 'Money',
@@ -135,6 +128,14 @@ export function App() {
                 element={
                   <RequirePermission permission="shift.view">
                     <ShiftsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/expenses"
+                element={
+                  <RequirePermission permission="expense.view">
+                    <ExpensesPage />
                   </RequirePermission>
                 }
               />
