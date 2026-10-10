@@ -42,7 +42,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Command Center',
     items: [
       {
-        label: 'Executive Dashboard',
+        label: 'Dashboard',
         to: '/',
         icon: LayoutDashboard,
         permission: 'dashboard.view',

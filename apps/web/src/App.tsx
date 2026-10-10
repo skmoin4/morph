@@ -7,7 +7,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PeoplePage } from './pages/PeoplePage';
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage';
 import { UiKitPage } from './pages/UiKitPage';
-import { HomePage } from './pages/HomePage';
+import { DashboardPage } from './pages/DashboardPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { BookingsPage } from './pages/BookingsPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -58,7 +58,7 @@ export function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedShell />}>
-              <Route index element={<HomePage />} />
+              <Route index element={<DashboardPage />} />
               <Route path="/ui-kit" element={<UiKitPage />} />
               <Route
                 path="/settings"
