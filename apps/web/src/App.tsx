@@ -18,6 +18,7 @@ import { ShiftsPage } from './pages/ShiftsPage';
 import { LeavePage } from './pages/LeavePage';
 import { TimesheetsPage } from './pages/TimesheetsPage';
 import { ExpensesPage } from './pages/ExpensesPage';
+import { ProjectCostPage } from './pages/ProjectCostPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { EmptyState } from './components/ui/EmptyState';
 import { PageHeader } from './components/layout/PageHeader';
@@ -31,14 +32,6 @@ const MODULES: Array<{
   step: string;
   permission: string;
 }> = [
-  {
-    path: '/project-cost',
-    eyebrow: 'Money',
-    title: 'Project Cost',
-    subtitle: 'The cost ledger, budget vs actual.',
-    step: 'step 12',
-    permission: 'cost.view',
-  },
   {
     path: '/reports',
     eyebrow: 'Insights',
@@ -128,6 +121,14 @@ export function App() {
                 element={
                   <RequirePermission permission="shift.view">
                     <ShiftsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/project-cost"
+                element={
+                  <RequirePermission permission="cost.view">
+                    <ProjectCostPage />
                   </RequirePermission>
                 }
               />

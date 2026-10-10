@@ -29,6 +29,7 @@ import {
   reverseTimesheetCost,
   type TxClient,
 } from '../cost/cost-posting.logic';
+import { BudgetAlertService } from '../cost/budget-alert.service';
 import { d, iso, num, TimeService } from './time.service';
 
 const SHEET_INCLUDE = {
@@ -62,7 +63,18 @@ export class TimesheetsService {
     private readonly notify: NotifyService,
     private readonly time: TimeService,
     private readonly clock: Clock,
+    private readonly budget: BudgetAlertService,
   ) {}
+
+  /** The projects a timesheet's hours were on. */
+  private async projectsOf(timesheetId: string): Promise<string[]> {
+    const rows = await this.prisma.scoped.timeEntry.findMany({
+      where: { timesheetId, deletedAt: null },
+      select: { projectId: true },
+      distinct: ['projectId'],
+    });
+    return rows.map((r) => r.projectId);
+  }
 
   private notFound() {
     return new NotFoundException({ code: 'NOT_FOUND', message: 'Timesheet not found.' });
@@ -424,6 +436,7 @@ export class TimesheetsService {
       });
     });
 
+    if (input.decision === 'APPROVED') await this.budget.evaluate(await this.projectsOf(id));
     await this.audit.record({
       action: input.decision === 'APPROVED' ? 'APPROVE' : 'REJECT',
       entityType: 'Timesheet',
@@ -535,6 +548,7 @@ export class TimesheetsService {
       return result;
     });
 
+    await this.budget.evaluate(await this.projectsOf(id));
     await this.audit.record({
       action: 'REOPEN',
       entityType: 'Timesheet',

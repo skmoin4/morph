@@ -5,6 +5,9 @@ import { Progress } from '../../components/ui/Progress';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatCurrencyShort, formatDisplayDate } from '../../lib/format';
 import { BILLING_LABEL } from '../bookings/BookingBadges';
+import { useAuth } from '../../providers/AuthProvider';
+import { BurnChart } from '../cost/BurnChart';
+import { useCostSummary } from '../cost/useCost';
 import { personName, type ProjectDetail } from './useProjects';
 
 function daysUntil(date: string | null): number | null {
@@ -16,6 +19,9 @@ function daysUntil(date: string | null): number | null {
 
 export function OverviewTab({ project }: { project: ProjectDetail }) {
   const { tasks } = project;
+  const { can } = useAuth();
+  const canSeeCost = can('cost.view');
+  const { data: cost } = useCostSummary(project.id, canSeeCost);
   const taskPercent = tasks.total === 0 ? 0 : Math.round((tasks.DONE / tasks.total) * 100);
   const burn = project.hoursBurnPercent;
   const left = daysUntil(project.endDate);
@@ -79,6 +85,16 @@ export function OverviewTab({ project }: { project: ProjectDetail }) {
           />
         )}
       </MetricRow>
+
+      {canSeeCost && cost && (
+        <Panel title="Burn against budget" subtitle="Approved hours as a running total.">
+          <BurnChart
+            series={cost.series}
+            budgetHours={cost.budgetHours}
+            today={new Date().toISOString().slice(0, 10)}
+          />
+        </Panel>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-3">
         <Panel title="Delivery snapshot" className="lg:col-span-2">

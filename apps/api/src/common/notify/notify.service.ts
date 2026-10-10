@@ -89,13 +89,62 @@ export class NotifyService {
     for (const holder of holders) {
       const me = holder.employee;
       if (!me || me.id === subjectEmployeeId || me.id === options.exceptEmployeeId) continue;
-      if (holder.role.systemKey && options.excludeRoleKeys?.includes(holder.role.systemKey)) continue;
+      if (holder.role.systemKey && options.excludeRoleKeys?.includes(holder.role.systemKey))
+        continue;
       const dataScope = (holder.role.permissions[0]?.dataScope ?? DataScope.OWN) as DataScope;
       const ids = await this.scope.visibleEmployeeIds(
         { employeeId: me.id, officeId: me.officeId } as AuthenticatedUser,
         dataScope,
       );
       if (ids === null || ids.includes(subjectEmployeeId)) recipients.push(holder.id);
+    }
+    if (recipients.length === 0) return 0;
+    await this.prisma.scoped.notification.createMany({
+      data: recipients.map((userId) => this.row(userId, type, note)) as never,
+    });
+    return recipients.length;
+  }
+
+  /**
+   * Everyone who holds `permissionKey` with a scope that reaches the project —
+   * the project's manager, the CEO, Finance — for alerts about the project itself.
+   */
+  async toProjectHolders(
+    permissionKey: string,
+    projectId: string,
+    type: NotificationType,
+    note: Note,
+  ): Promise<number> {
+    const holders = await this.prisma.scoped.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        deletedAt: null,
+        employee: { isNot: null },
+        role: { permissions: { some: { permission: { key: permissionKey } } } },
+      },
+      select: {
+        id: true,
+        employee: { select: { id: true, officeId: true } },
+        role: {
+          select: {
+            permissions: {
+              where: { permission: { key: permissionKey } },
+              select: { dataScope: true },
+            },
+          },
+        },
+      },
+    });
+    const recipients: string[] = [];
+    for (const holder of holders) {
+      const me = holder.employee;
+      if (!me) continue;
+      const dataScope = (holder.role.permissions[0]?.dataScope ?? DataScope.OWN) as DataScope;
+      const ids = await this.scope.visibleProjectIds(
+        { employeeId: me.id, officeId: me.officeId } as AuthenticatedUser,
+        dataScope,
+      );
+      if (ids === null || ids.includes(projectId)) recipients.push(holder.id);
     }
     if (recipients.length === 0) return 0;
     await this.prisma.scoped.notification.createMany({

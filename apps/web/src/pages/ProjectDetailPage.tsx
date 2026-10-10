@@ -20,15 +20,8 @@ import { TaskBoard } from '../features/projects/TaskBoard';
 import { TeamTab } from '../features/projects/TeamTab';
 import { ProjectTimeTab } from '../features/time/ProjectTimeTab';
 import { ProjectExpensesTab } from '../features/expenses/ProjectExpensesTab';
+import { ProjectCostTab } from '../features/cost/ProjectCostTab';
 import { useProject } from '../features/projects/useProjects';
-
-const LATER_TABS = {
-  cost: {
-    label: 'Cost ledger',
-    step: 'step 12',
-    what: 'Every posting to the project cost, with the rate applied',
-  },
-} as const;
 
 /** Project 360: one page for everything about a project. */
 export function ProjectDetailPage() {
@@ -94,10 +87,8 @@ export function ProjectDetailPage() {
     { key: 'tasks', label: 'Tasks', count: project.tasks.total },
     ...(can('timesheet.view') ? [{ key: 'time', label: 'Time' }] : []),
     ...(can('expense.view') ? [{ key: 'expenses', label: 'Expenses' }] : []),
-    ...Object.entries(LATER_TABS).map(([key, value]) => ({ key, label: value.label })),
+    ...(can('cost.view') ? [{ key: 'cost', label: 'Cost ledger' }] : []),
   ];
-
-  const later = tab in LATER_TABS ? LATER_TABS[tab as keyof typeof LATER_TABS] : null;
 
   return (
     <div className="space-y-5">
@@ -148,14 +139,7 @@ export function ProjectDetailPage() {
           <ProjectTimeTab projectId={project.id} budgetHours={Number(project.budgetHours)} />
         )}
         {tab === 'expenses' && can('expense.view') && <ProjectExpensesTab projectId={project.id} />}
-        {later && (
-          <Panel title={later.label}>
-            <EmptyState
-              title="Coming in a later step"
-              description={`${later.what} will appear here in ${later.step}.`}
-            />
-          </Panel>
-        )}
+        {tab === 'cost' && can('cost.view') && <ProjectCostTab projectId={project.id} />}
       </TabPanel>
 
       {editing && <EditProjectDrawer project={project} onClose={() => setEditing(false)} />}

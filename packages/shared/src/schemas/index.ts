@@ -9,3 +9,4 @@ export * from './attendance';
 export * from './leave';
 export * from './time';
 export * from './expense';
+export * from './cost';

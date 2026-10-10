@@ -113,7 +113,13 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'expense.view',
         ready: true,
       },
-      { label: 'Project Cost', to: '/project-cost', icon: Coins, permission: 'cost.view' },
+      {
+        label: 'Project Cost',
+        to: '/project-cost',
+        icon: Coins,
+        permission: 'cost.view',
+        ready: true,
+      },
     ],
   },
   {
