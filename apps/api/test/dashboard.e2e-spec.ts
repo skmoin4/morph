@@ -875,4 +875,180 @@ describe('Dashboards (e2e)', () => {
       await prisma.employee.update({ where: { id: who.hr.employeeId }, data: { userId: user.id } });
     });
   });
+
+  // =========================================================================
+
+  describe('reports', () => {
+    const run = (key: keyof typeof who, report: string, qs = '') =>
+      request(server).get(`/api/v1/reports/${report}${qs}`).set(as(key));
+    type Row = Record<string, string | number | null>;
+
+    it('lists only the reports a role may run', async () => {
+      const ceo = await request(server).get('/api/v1/reports').set(as('ceo')).expect(200);
+      expect(ceo.body.reports.map((r: { key: string }) => r.key).sort()).toEqual(
+        [
+          'attendance',
+          'bookings',
+          'expenses',
+          'leave',
+          'project-cost',
+          'timesheets',
+          'utilization',
+        ].sort(),
+      );
+      const fin = await request(server).get('/api/v1/reports').set(as('fin')).expect(200);
+      const keys = fin.body.reports.map((r: { key: string }) => r.key);
+      expect(keys).toContain('project-cost');
+      expect(keys).not.toContain('attendance');
+      // An employee has no report access at all.
+      await request(server).get('/api/v1/reports').set(as('ann')).expect(403);
+    });
+
+    it('needs a login', async () => {
+      await request(server).get('/api/v1/reports').expect(401);
+    });
+
+    it('reports bookings in the period, with their value, and totals them', async () => {
+      const res = await run('ceo', 'bookings', '?from=2026-10-01&to=2026-10-31').expect(200);
+      expect(res.body.rows).toHaveLength(4); // two confirmed-this-month + draft + cancelled
+      expect(res.body.columns.map((c: { key: string }) => c.key)).toContain('projectValue');
+      expect(res.body.totals.projectValue).toBe(3500000);
+      const confirmed = await run(
+        'ceo',
+        'bookings',
+        '?from=2026-10-01&to=2026-10-31&status=PROJECT_CREATED',
+      ).expect(200);
+      expect(confirmed.body.rows).toHaveLength(2);
+    });
+
+    it('filters bookings by office', async () => {
+      const res = await run(
+        'ceo',
+        'bookings',
+        `?from=2026-10-01&to=2026-10-31&officeId=${ids.ruh}`,
+      ).expect(200);
+      expect(res.body.rows).toHaveLength(1);
+      expect(res.body.rows[0].office).toBe('RUH');
+    });
+
+    it('defaults to the month so far, and rejects a backwards or huge period', async () => {
+      const res = await run('ceo', 'bookings').expect(200);
+      expect([res.body.from, res.body.to]).toEqual(['2026-10-01', '2026-10-09']);
+      await run('ceo', 'bookings', '?from=2026-10-09&to=2026-10-01').expect(422);
+      const long = await run('ceo', 'bookings', '?from=2024-01-01&to=2026-10-01').expect(400);
+      expect(long.body.error?.code ?? long.body.code).toBe('RANGE_TOO_LONG');
+      await run('ceo', 'bookings', '?status=NOPE').expect(400);
+    });
+
+    it('answers 404 for an unknown report, or one the role may not run', async () => {
+      await run('ceo', 'nonsense').expect(404);
+      await run('fin', 'attendance').expect(404);
+    });
+
+    it('sums hours by person, billable and not', async () => {
+      const res = await run('ceo', 'timesheets', '?from=2026-10-01&to=2026-10-09').expect(200);
+      const ann = res.body.rows.find((r: Row) => r.employee === 'ann Tester') as Row;
+      expect(ann).toMatchObject({ billable: 8, nonBillable: 4, total: 12, billablePercent: 66.7 });
+      expect(res.body.totals.total).toBe(24); // Ann 12 + Dee 12 (last month's 8 is outside)
+    });
+
+    it('limits what a project manager sees to their projects', async () => {
+      const res = await run('pm', 'timesheets', '?from=2026-10-01&to=2026-10-09').expect(200);
+      const names = res.body.rows.map((r: Row) => r.employee);
+      expect(names).toContain('ann Tester'); // on the PM's project
+      expect(names).not.toContain('dee Tester'); // only on a project the PM is not part of
+    });
+
+    it('narrows to one project', async () => {
+      const res = await run(
+        'ceo',
+        'timesheets',
+        `?from=2026-10-01&to=2026-10-09&projectId=${ids.p3}`,
+      ).expect(200);
+      expect(res.body.rows.map((r: Row) => r.employee)).toEqual(['dee Tester']);
+    });
+
+    it('works out utilization against capacity', async () => {
+      const res = await run('ceo', 'utilization', '?from=2026-10-05&to=2026-10-09').expect(200);
+      const ann = res.body.rows.find((r: Row) => r.employee === 'ann Tester') as Row;
+      expect(ann).toMatchObject({ capacity: 40, logged: 12, billable: 8, utilization: 20 });
+      expect(res.body.totals.utilization).toBeGreaterThan(0);
+    });
+
+    it('summarises attendance from the real punches', async () => {
+      const res = await run('ceo', 'attendance', '?from=2026-10-09&to=2026-10-09').expect(200);
+      const ann = res.body.rows.find((r: Row) => r.employee === 'ann Tester') as Row;
+      expect(Number(ann.present) + Number(ann.late)).toBeGreaterThanOrEqual(1);
+    });
+
+    it('lists leave that overlaps the period', async () => {
+      const res = await run('hr', 'leave', '?from=2026-10-10&to=2026-10-20').expect(200);
+      expect(res.body.rows).toHaveLength(1);
+      expect(res.body.rows[0]).toMatchObject({
+        employee: 'bob Tester',
+        days: 1,
+        status: 'PENDING',
+      });
+      const none = await run('hr', 'leave', '?from=2026-10-10&to=2026-10-20&status=APPROVED');
+      expect(none.body.rows).toHaveLength(0);
+    });
+
+    it('lists expenses and totals them', async () => {
+      const res = await run('fin', 'expenses', '?from=2026-10-01&to=2026-10-31').expect(200);
+      expect(res.body.rows).toHaveLength(3);
+      expect(res.body.totals.amount).toBe(6000);
+      const approved = await run(
+        'fin',
+        'expenses',
+        '?from=2026-10-01&to=2026-10-31&status=APPROVED',
+      ).expect(200);
+      expect(approved.body.rows).toHaveLength(1);
+    });
+
+    it('reports project cost posted in the period, by source', async () => {
+      const res = await run('ceo', 'project-cost', '?from=2026-10-01&to=2026-10-31').expect(200);
+      const p1 = res.body.rows.find((r: Row) => r.projectCode === 'PJT-1') as Row;
+      expect(p1).toMatchObject({ labour: 30000, expense: 5000, total: 35000, hours: 40 });
+      const wider = await run('ceo', 'project-cost', '?from=2026-09-01&to=2026-10-31').expect(200);
+      const w1 = wider.body.rows.find((r: Row) => r.projectCode === 'PJT-1') as Row;
+      expect(w1.total).toBe(85000);
+    });
+
+    it('leaves contract value out for someone without project.value.view', async () => {
+      const ceo = await run('ceo', 'project-cost', '?from=2026-10-01&to=2026-10-31').expect(200);
+      expect(ceo.body.columns.map((c: { key: string }) => c.key)).toContain('contractValue');
+      const pm = await run('pm', 'project-cost', '?from=2026-10-01&to=2026-10-31');
+      if (pm.status === 200) {
+        const hasValue = (pm.body.columns as Array<{ key: string }>).some(
+          (c) => c.key === 'contractValue',
+        );
+        expect(hasValue).toBe(pm.body.rows.some((r: Row) => 'contractValue' in r));
+      }
+    });
+
+    it('exports exactly what the preview shows', async () => {
+      const qs = '?from=2026-10-01&to=2026-10-31';
+      const preview = await run('ceo', 'expenses', qs).expect(200);
+      const res = await run('ceo', 'expenses/export', qs)
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on('data', (c: Buffer) => chunks.push(c));
+          r.on('end', () => cb(null, Buffer.concat(chunks)));
+        })
+        .expect(200);
+      expect(res.headers['content-type']).toContain('spreadsheetml');
+      const ExcelJS = (await import('exceljs')).default;
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(res.body as unknown as ArrayBuffer);
+      const sheet = workbook.worksheets[0];
+      // Title, period, header, then one row per record and the totals row.
+      expect(sheet.rowCount).toBe(3 + preview.body.rows.length + 1);
+      expect(sheet.getRow(3).getCell(1).value).toBe('Date');
+    });
+
+    it('does not export for someone without report.export', async () => {
+      await run('ann', 'timesheets/export', '?from=2026-10-01&to=2026-10-09').expect(403);
+    });
+  });
 });

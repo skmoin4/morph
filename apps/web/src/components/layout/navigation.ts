@@ -125,7 +125,13 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Insights & Admin',
     items: [
-      { label: 'Reports', to: '/reports', icon: BarChart3, permission: 'report.view' },
+      {
+        label: 'Reports',
+        to: '/reports',
+        icon: BarChart3,
+        permission: 'report.view',
+        ready: true,
+      },
       {
         label: 'Roles & Permissions',
         to: '/roles',

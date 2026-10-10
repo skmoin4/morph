@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "claude/dreamy-curie-2n5ced",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "claude/dreamy-curie-2n5ced": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "claude/dreamy-curie-2n5ced",
+    "origin"
+  ]
+}
