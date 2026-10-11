@@ -71,6 +71,12 @@ const envSchema = z.object({
 export type AppEnv = z.infer<typeof envSchema> & { corsOrigins: string[] };
 
 export function validateEnv(raw: Record<string, unknown>): AppEnv {
+  // Hosting platforms (Render, Railway, Fly.io, ...) assign the listen port
+  // via `PORT` and expect the app to bind to it. Fall back to it only when
+  // `API_PORT` wasn't explicitly configured.
+  if (raw.API_PORT === undefined && raw.PORT !== undefined) {
+    raw = { ...raw, API_PORT: raw.PORT };
+  }
   const parsed = envSchema.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
