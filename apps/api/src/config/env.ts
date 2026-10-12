@@ -31,7 +31,11 @@ const envSchema = z.object({
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_REFRESH_TTL: z.string().default('7d'),
-  COOKIE_DOMAIN: z.string().default('localhost'),
+  // Left blank in production: the API and web app usually live on unrelated
+  // domains (Vercel + Render, say), where an explicit cookie domain is both
+  // unnecessary and, if malformed, fatal (the cookie lib throws on an
+  // invalid value). Local dev sets this explicitly via .env.
+  COOKIE_DOMAIN: z.string().default(''),
   COOKIE_SECURE: z
     .string()
     .default('false')
