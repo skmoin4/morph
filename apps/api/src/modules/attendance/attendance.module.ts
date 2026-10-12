@@ -24,6 +24,7 @@ const queueImports: DynamicModule[] = jobsEnabled
             port: config.get<number>('REDIS_PORT') ?? 6379,
             password: config.get<string>('REDIS_PASSWORD') || undefined,
             db: config.get<number>('REDIS_DB') ?? 0,
+            tls: config.get<boolean>('REDIS_TLS') ? {} : undefined,
             // Do not hang a request, or the boot, waiting on Redis.
             maxRetriesPerRequest: null,
           },

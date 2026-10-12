@@ -42,6 +42,10 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number().int().default(6379),
   REDIS_PASSWORD: z.string().optional(),
   REDIS_DB: z.coerce.number().int().default(0),
+  REDIS_TLS: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
 
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   STORAGE_LOCAL_ROOT: z.string().default('./storage'),
