@@ -164,8 +164,7 @@ export class TokenService {
   setRefreshCookie(res: Response, token: string): void {
     res.cookie(REFRESH_COOKIE, token, {
       httpOnly: true,
-      secure: this.config.get<string>('COOKIE_SECURE') === 'true',
-      sameSite: 'lax',
+      ...cookieOriginOptions(this.config),
       domain: this.config.get<string>('COOKIE_DOMAIN') || undefined,
       path: '/api/v1/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -175,10 +174,23 @@ export class TokenService {
   clearRefreshCookie(res: Response): void {
     res.clearCookie(REFRESH_COOKIE, {
       httpOnly: true,
-      secure: this.config.get<string>('COOKIE_SECURE') === 'true',
-      sameSite: 'lax',
+      ...cookieOriginOptions(this.config),
       domain: this.config.get<string>('COOKIE_DOMAIN') || undefined,
       path: '/api/v1/auth',
     });
   }
+}
+
+/**
+ * `secure` and `sameSite` must move together: a cross-site cookie (the API
+ * and web app on different domains, e.g. Render + Vercel) needs
+ * `SameSite=None`, which browsers only honour alongside `Secure`. Locally,
+ * over plain HTTP, neither applies.
+ */
+function cookieOriginOptions(config: ConfigService): {
+  secure: boolean;
+  sameSite: 'none' | 'lax';
+} {
+  const secure = config.get<boolean>('COOKIE_SECURE') ?? false;
+  return { secure, sameSite: secure ? 'none' : 'lax' };
 }
