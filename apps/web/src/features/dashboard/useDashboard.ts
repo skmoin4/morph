@@ -18,7 +18,7 @@ export type Health = 'HEALTHY' | 'AT_RISK' | 'CRITICAL' | string;
 
 export interface ActionItem {
   id: string;
-  severity: 'high' | 'medium' | 'low';
+  severity: 'high' | 'medium' | 'info';
   kind: string;
   title: string;
   detail: string;

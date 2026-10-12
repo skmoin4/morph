@@ -31,7 +31,7 @@ const SEVERITY: Record<ActionItem['severity'], { tone: 'red' | 'amber' | 'blue';
   {
     high: { tone: 'red', label: 'Now' },
     medium: { tone: 'amber', label: 'Soon' },
-    low: { tone: 'blue', label: 'FYI' },
+    info: { tone: 'blue', label: 'FYI' },
   };
 
 /** A small bold figure with a caption, used in the Work and Money panels. */
